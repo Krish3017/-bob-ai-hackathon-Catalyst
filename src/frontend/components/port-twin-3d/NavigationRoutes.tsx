@@ -130,6 +130,7 @@ export function NavigationRoutes({
                 key={anc.id}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if ((e as any).delta > 4) return;
                   onSelectAnchorage?.(anc);
                 }}
               >

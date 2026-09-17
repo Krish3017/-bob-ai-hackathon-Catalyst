@@ -10,6 +10,7 @@ interface BerthsProps {
   berths: PortTwinBerth[];
   selectedBerthId?: string | null;
   onSelectBerth: (berth: PortTwinBerth) => void;
+  onHoverBerth?: (berth: PortTwinBerth | null, x?: number, y?: number) => void;
   visible?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function Berths({
   berths,
   selectedBerthId,
   onSelectBerth,
+  onHoverBerth,
   visible = true,
 }: BerthsProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -62,16 +64,23 @@ export function Berths({
             key={berth.id}
             onClick={(e) => {
               e.stopPropagation();
+              if ((e as any).delta > 4) return;
               onSelectBerth(berth);
             }}
             onPointerOver={(e) => {
               e.stopPropagation();
               setHoveredId(berth.id);
               document.body.style.cursor = "pointer";
+              onHoverBerth?.(berth, e.clientX, e.clientY);
+            }}
+            onPointerMove={(e) => {
+              e.stopPropagation();
+              onHoverBerth?.(berth, e.clientX, e.clientY);
             }}
             onPointerOut={() => {
               setHoveredId(null);
               document.body.style.cursor = "auto";
+              onHoverBerth?.(null);
             }}
           >
             {/* 1. Berth Mooring Pocket Decal Pad */}
@@ -124,31 +133,28 @@ export function Berths({
               );
             })}
 
-            {/* 4. Compact Light GIS Berth Label Badge */}
+            {/* 4. Compact Light GIS Berth Marker Badge */}
             <Html
-              position={[cx, 1.4, cz]}
+              position={[cx, 1.2, cz]}
               center
               distanceFactor={85}
               zIndexRange={[10, 0]}
               style={{ pointerEvents: "none" }}
             >
               <div
-                className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-mono font-bold shadow-sm transition-all select-none ${
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none ${
                   isSelected
-                    ? "bg-slate-900 border-2 border-blue-500 text-white shadow-md scale-105"
+                    ? "bg-slate-900 border border-blue-500 text-white shadow-md"
                     : isHovered
                     ? "bg-white border border-blue-500 text-blue-900 shadow"
                     : "bg-white/95 border border-slate-300 text-slate-800"
                 }`}
               >
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: statusColor }}
                 />
                 <span>{berth.berth_code}</span>
-                <span className="text-[9px] font-normal text-slate-500 font-sans">
-                  {berth.max_vessel_length}m
-                </span>
               </div>
             </Html>
           </group>

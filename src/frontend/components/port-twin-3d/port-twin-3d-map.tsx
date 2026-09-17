@@ -23,6 +23,7 @@ import {
 import { PortScene, PortSceneControlsHandle, LayerVisibility3D } from "./PortScene";
 import { PortTwinOverlay } from "../port-twin/port-twin-overlay";
 import { PortTwinPopup, InspectedObject } from "../port-twin/port-twin-popup";
+import { PortTwinTooltip, HoveredAsset } from "../port-twin/port-twin-tooltip";
 import { PortTwinIntelligence, IntelligenceTab } from "../port-twin/port-twin-intelligence";
 import { geoToWorld } from "./coords";
 import { api } from "@/lib/api";
@@ -69,17 +70,39 @@ function interpolateRoutePosition(
 }
 
 export function PortTwin3DMap() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const sceneControlsRef = useRef<PortSceneControlsHandle>(null);
 
   // Inspection Selection State
   const [selectedObject, setSelectedObject] = useState<InspectedObject | null>(null);
+  const [hoveredAsset, setHoveredAsset] = useState<HoveredAsset | null>(null);
   const [is25DPitch, setIs25DPitch] = useState(true);
 
-  // Simulation State
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [simSpeed, setSimSpeed] = useState<1 | 2 | 5>(1);
+  // Fullscreen Viewport Mode
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const handleToggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => {
+      const next = !prev;
+      setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 50);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        handleToggleFullscreen();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, handleToggleFullscreen]);
+
+  // Static Port Asset State (Simulation animations removed for operational clarity)
   const [vessels, setVessels] = useState<PortTwinVessel[]>(PORT_VESSELS);
-  const [simSeconds, setSimSeconds] = useState(14 * 3600 + 30 * 60);
 
   // Dynamic Assets (Supports scenario failure injection)
   const [cranes, setCranes] = useState<PortTwinCrane[]>(PORT_CRANES);
@@ -117,8 +140,6 @@ export function PortTwin3DMap() {
     proposedPlan: true,
   });
 
-  const activeTransitCount = vessels.filter((v) => v.status === "Approaching").length;
-
   // Stats Telemetry
   const stats = {
     totalVessels: vessels.length,
@@ -132,44 +153,6 @@ export function PortTwin3DMap() {
       PORT_YARDS.reduce((acc, y) => acc + y.utilization_pct, 0) / PORT_YARDS.length
     ),
   };
-
-  const formatSimClock = (totalSec: number) => {
-    const hrs = Math.floor(totalSec / 3600) % 24;
-    const mins = Math.floor((totalSec % 3600) / 60);
-    const secs = Math.floor(totalSec % 60);
-    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")} UTC`;
-  };
-
-  // Simulation Ticker Loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const interval = setInterval(() => {
-      setSimSeconds((prev) => prev + 1 * simSpeed);
-
-      setVessels((prev) =>
-        prev.map((v) => {
-          if (!v.route_id) return v;
-          const route = PORT_ROUTES.find((r) => r.id === v.route_id);
-          if (!route) return v;
-
-          const speedFactor = (v.speed_knots || 10) * 0.0003 * simSpeed;
-          let nextProgress = (v.route_progress || 0) + speedFactor;
-          if (nextProgress > 1.0) nextProgress = 0.0;
-
-          const { coords, heading } = interpolateRoutePosition(route.waypoints, nextProgress);
-          return {
-            ...v,
-            route_progress: nextProgress,
-            coordinates: coords,
-            heading_degrees: heading,
-          };
-        })
-      );
-    }, 60);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, simSpeed]);
 
   // Object Selection Handlers
   const handleSelectBerth = useCallback((b: PortTwinBerth) => {
@@ -296,12 +279,6 @@ export function PortTwin3DMap() {
     setLayers((prev) => ({ ...prev, [layerKey]: !prev[layerKey] }));
   }, []);
 
-  const handleResetSimulation = () => {
-    setVessels(PORT_VESSELS);
-    setSimSeconds(14 * 3600 + 30 * 60);
-    handleClearScenario();
-  };
-
   const handleTogglePitch = () => {
     const next = !is25DPitch;
     setIs25DPitch(next);
@@ -311,7 +288,14 @@ export function PortTwin3DMap() {
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* 1. CLEAN PORT DIGITAL TWIN MAP VIEWPORT */}
-      <div className="relative w-full h-[640px] bg-[#dbeafe] overflow-hidden select-none rounded-2xl border border-slate-200 shadow-sm">
+      <div
+        ref={containerRef}
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 w-screen h-screen bg-[#dbeafe] overflow-hidden select-none"
+            : "relative w-full h-[640px] bg-[#dbeafe] overflow-hidden select-none rounded-2xl border border-slate-200 shadow-sm"
+        }
+      >
         {/* Three.js R3F Light GIS Scene */}
         <PortScene
           ref={sceneControlsRef}
@@ -335,7 +319,17 @@ export function PortTwin3DMap() {
           onSelectAnchorage={handleSelectAnchorage}
           onSelectDisruption={handleSelectDisruption}
           onSelectRecommendation={handleSelectRecommendation}
-          onPointerMissed={() => setSelectedObject(null)}
+          onHoverAsset={setHoveredAsset}
+          onPointerMissed={() => {
+            setSelectedObject(null);
+            setHoveredAsset(null);
+          }}
+        />
+
+        {/* HOVER TOOLTIP UX (Small compact tooltip anchored to cursor/asset) */}
+        <PortTwinTooltip
+          hovered={hoveredAsset}
+          containerBounds={containerRef.current?.getBoundingClientRect()}
         />
 
         {/* COMPACT MAP OVERLAY HUD (Clean Light GIS Controls) */}
@@ -345,15 +339,14 @@ export function PortTwin3DMap() {
           onZoomIn={() => sceneControlsRef.current?.zoomIn()}
           onZoomOut={() => sceneControlsRef.current?.zoomOut()}
           onResetView={() => sceneControlsRef.current?.resetCamera()}
+          onPanUp={() => sceneControlsRef.current?.panUp()}
+          onPanDown={() => sceneControlsRef.current?.panDown()}
+          onPanLeft={() => sceneControlsRef.current?.panLeft()}
+          onPanRight={() => sceneControlsRef.current?.panRight()}
           onTogglePitch={handleTogglePitch}
           is25DPitch={is25DPitch}
-          isPlaying={isPlaying}
-          onTogglePlay={() => setIsPlaying(!isPlaying)}
-          simSpeed={simSpeed}
-          onChangeSpeed={(s) => setSimSpeed(s)}
-          onResetSimulation={handleResetSimulation}
-          simClock={formatSimClock(simSeconds)}
-          activeTransitCount={activeTransitCount}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
           stats={stats}
         />
 
@@ -363,40 +356,33 @@ export function PortTwin3DMap() {
           onClose={() => setSelectedObject(null)}
           onSelectObject={(obj) => setSelectedObject(obj)}
         />
-
-        {/* Subtle Map Corner Datum Coordinate Tag */}
-        <div className="absolute top-3 right-4 pointer-events-none hidden lg:flex items-center gap-2 rounded-md bg-white/95 border border-slate-200 px-2.5 py-1 text-[10px] font-mono text-slate-600 shadow-sm z-10 backdrop-blur-sm">
-          <span className="text-blue-600 font-bold">GIS 2.5D</span>
-          <span className="text-slate-300">|</span>
-          <span className="text-slate-700">LAT 01°15.3'N</span>
-          <span className="text-slate-300">|</span>
-          <span className="text-slate-700">LON 103°45.2'E</span>
-        </div>
       </div>
 
-      {/* 2. OPERATIONAL INTELLIGENCE & SCENARIO STUDIO (MOVED OUTSIDE & BELOW THE MAP) */}
-      <PortTwinIntelligence
-        activeTab={intelligenceTab}
-        onChangeTab={(t) => setIntelligenceTab(t)}
-        disruptions={disruptions}
-        selectedDisruptionId={selectedDisruption?.id || null}
-        onSelectDisruption={handleSelectDisruption}
-        recommendations={recommendations}
-        selectedRecommendationId={selectedRecommendation?.id || null}
-        onSelectRecommendation={handleSelectRecommendation}
-        showProposedPlan={showProposedPlan}
-        onToggleProposedPlan={() => {
-          const next = !showProposedPlan;
-          setShowProposedPlan(next);
-          handleToggleLayer("proposedPlan");
-        }}
-        scenarioPresets={PORT_SCENARIO_PRESETS}
-        activeScenario={activeScenario}
-        onActivateScenario={handleActivateScenario}
-        onClearScenario={handleClearScenario}
-        isSimulating={isSimulating}
-        simulationDeltas={simulationDeltas}
-      />
+      {/* 2. OPERATIONAL INTELLIGENCE & SCENARIO STUDIO (EXTERNALIZED BELOW THE MAP) */}
+      {!isFullscreen && (
+        <PortTwinIntelligence
+          activeTab={intelligenceTab}
+          onChangeTab={(t) => setIntelligenceTab(t)}
+          disruptions={disruptions}
+          selectedDisruptionId={selectedDisruption?.id || null}
+          onSelectDisruption={handleSelectDisruption}
+          recommendations={recommendations}
+          selectedRecommendationId={selectedRecommendation?.id || null}
+          onSelectRecommendation={handleSelectRecommendation}
+          showProposedPlan={showProposedPlan}
+          onToggleProposedPlan={() => {
+            const next = !showProposedPlan;
+            setShowProposedPlan(next);
+            handleToggleLayer("proposedPlan");
+          }}
+          scenarioPresets={PORT_SCENARIO_PRESETS}
+          activeScenario={activeScenario}
+          onActivateScenario={handleActivateScenario}
+          onClearScenario={handleClearScenario}
+          isSimulating={isSimulating}
+          simulationDeltas={simulationDeltas}
+        />
+      )}
     </div>
   );
 }

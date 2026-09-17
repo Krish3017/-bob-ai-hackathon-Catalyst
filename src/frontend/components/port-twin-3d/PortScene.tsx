@@ -25,6 +25,7 @@ import {
   PortTwinDisruption,
   PortTwinOptimizationRecommendation,
 } from "@/data/port-twin-data";
+import { HoveredAsset } from "../port-twin/port-twin-tooltip";
 
 export interface PortSceneControlsHandle {
   resetCamera: () => void;
@@ -32,6 +33,10 @@ export interface PortSceneControlsHandle {
   zoomOut: () => void;
   togglePitch: (is25D: boolean) => void;
   flyTo: (coords: [number, number, number]) => void;
+  panUp: () => void;
+  panDown: () => void;
+  panLeft: () => void;
+  panRight: () => void;
 }
 
 export interface LayerVisibility3D {
@@ -70,6 +75,7 @@ interface PortSceneProps {
   onSelectDisruption: (d: PortTwinDisruption) => void;
   onSelectRecommendation: (rec: PortTwinOptimizationRecommendation) => void;
   onPointerMissed?: () => void;
+  onHoverAsset?: (asset: HoveredAsset | null) => void;
 }
 
 export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
@@ -96,10 +102,70 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
       onSelectDisruption,
       onSelectRecommendation,
       onPointerMissed,
+      onHoverAsset,
     },
     ref
   ) {
     const controlsRef = useRef<OrbitControlsImpl>(null);
+
+    const panDirection = (dir: "up" | "down" | "left" | "right") => {
+      if (!controlsRef.current) return;
+      const controls = controlsRef.current;
+      const cam = controls.object;
+      const target = controls.target;
+
+      // Camera view direction projected on the horizontal XZ plane
+      const forward = new THREE.Vector3().subVectors(target, cam.position);
+      forward.y = 0;
+      if (forward.lengthSq() < 0.0001) {
+        forward.set(0, 0, -1);
+      } else {
+        forward.normalize();
+      }
+
+      // Camera right vector = forward x (0, 1, 0)
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+      const PAN_STEP = 12;
+      const moveVec = new THREE.Vector3();
+
+      if (dir === "up") {
+        moveVec.addScaledVector(forward, PAN_STEP);
+      } else if (dir === "down") {
+        moveVec.addScaledVector(forward, -PAN_STEP);
+      } else if (dir === "left") {
+        moveVec.addScaledVector(right, -PAN_STEP);
+      } else if (dir === "right") {
+        moveVec.addScaledVector(right, PAN_STEP);
+      }
+
+      // Constrain target within port operational zone [-85, 85]
+      const newTargetX = Math.max(-85, Math.min(85, target.x + moveVec.x));
+      const newTargetZ = Math.max(-85, Math.min(85, target.z + moveVec.z));
+      const actualDx = newTargetX - target.x;
+      const actualDz = newTargetZ - target.z;
+
+      target.x = newTargetX;
+      target.z = newTargetZ;
+      cam.position.x += actualDx;
+      cam.position.z += actualDz;
+      controls.update();
+    };
+
+    const zoom = (factor: number) => {
+      if (!controlsRef.current) return;
+      const controls = controlsRef.current;
+      const cam = controls.object;
+      const target = controls.target;
+
+      const offset = new THREE.Vector3().subVectors(cam.position, target);
+      const currentDist = offset.length();
+      const newDist = Math.max(15, Math.min(260, currentDist * factor));
+      offset.setLength(newDist);
+
+      cam.position.copy(target).add(offset);
+      controls.update();
+    };
 
     useImperativeHandle(ref, () => ({
       resetCamera: () => {
@@ -109,20 +175,12 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
           controlsRef.current.update();
         }
       },
-      zoomIn: () => {
-        if (controlsRef.current) {
-          const cam = controlsRef.current.object;
-          cam.position.multiplyScalar(0.85);
-          controlsRef.current.update();
-        }
-      },
-      zoomOut: () => {
-        if (controlsRef.current) {
-          const cam = controlsRef.current.object;
-          cam.position.multiplyScalar(1.15);
-          controlsRef.current.update();
-        }
-      },
+      zoomIn: () => zoom(0.82),
+      zoomOut: () => zoom(1.22),
+      panUp: () => panDirection("up"),
+      panDown: () => panDirection("down"),
+      panLeft: () => panDirection("left"),
+      panRight: () => panDirection("right"),
       togglePitch: (is25D: boolean) => {
         if (controlsRef.current) {
           const cam = controlsRef.current.object;
@@ -144,8 +202,35 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
       },
     }));
 
+    // Keyboard Arrow Key panning listener
+    React.useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const active = document.activeElement;
+        if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+          return;
+        }
+
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          panDirection("up");
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          panDirection("down");
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          panDirection("left");
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          panDirection("right");
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
     return (
-      <div className="w-full h-full relative bg-[#dbeafe]">
+      <div className="w-full h-full relative bg-[#dbeafe] cursor-grab active:cursor-grabbing select-none">
         <Canvas
           shadows
           camera={{
@@ -196,6 +281,9 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             berths={berths}
             selectedBerthId={selectedBerthId}
             onSelectBerth={onSelectBerth}
+            onHoverBerth={(b, x, y) =>
+              onHoverAsset?.(b && x !== undefined && y !== undefined ? { type: "berth", data: b, x, y } : null)
+            }
             visible={layers.berths}
           />
 
@@ -203,6 +291,9 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             yards={yards}
             selectedYardId={selectedYardId}
             onSelectYard={onSelectYard}
+            onHoverYard={(y, x, ym) =>
+              onHoverAsset?.(y && x !== undefined && ym !== undefined ? { type: "yard", data: y, x, y: ym } : null)
+            }
             visible={layers.yards}
           />
 
@@ -210,6 +301,9 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             cranes={cranes}
             selectedCraneId={selectedCraneId}
             onSelectCrane={onSelectCrane}
+            onHoverCrane={(c, x, y) =>
+              onHoverAsset?.(c && x !== undefined && y !== undefined ? { type: "crane", data: c, x, y } : null)
+            }
             visible={layers.cranes}
           />
 
@@ -217,6 +311,9 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             vessels={vessels}
             selectedVesselId={selectedVesselId}
             onSelectVessel={onSelectVessel}
+            onHoverVessel={(v, x, y) =>
+              onHoverAsset?.(v && x !== undefined && y !== undefined ? { type: "vessel", data: v, x, y } : null)
+            }
             visible={layers.vessels}
           />
 
@@ -241,18 +338,29 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             visible={layers.proposedPlan}
           />
 
-          {/* Clean Interactive Orbit Controls */}
+          {/* Clean Interactive Map Orbit Controls */}
           <OrbitControls
             ref={controlsRef}
             target={[2, 0, 5]}
             enableDamping
             dampingFactor={0.08}
-            maxPolarAngle={Math.PI / 2.15}
-            minPolarAngle={0.08}
-            minDistance={10}
-            maxDistance={320}
-            panSpeed={0.9}
-            rotateSpeed={0.7}
+            screenSpacePanning={false}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.PAN,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.ROTATE,
+            }}
+            touches={{
+              ONE: THREE.TOUCH.PAN,
+              TWO: THREE.TOUCH.DOLLY_PAN,
+            }}
+            enableRotate={true}
+            rotateSpeed={0.8}
+            maxPolarAngle={Math.PI / 2.05}
+            minPolarAngle={0.05}
+            minDistance={12}
+            maxDistance={280}
+            panSpeed={1.0}
             zoomSpeed={1.0}
           />
         </Canvas>

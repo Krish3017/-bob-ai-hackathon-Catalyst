@@ -20,26 +20,10 @@ export function DisruptionOverlays({
   onSelectDisruption,
   visible = true,
 }: DisruptionOverlaysProps) {
-  const ringsRef = useRef<THREE.Group>(null);
-
-  // Subtle warning ring pulse
-  useFrame(({ clock }) => {
-    if (ringsRef.current) {
-      const t = clock.getElapsedTime() * 1.5;
-      ringsRef.current.children.forEach((child, i) => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.isMesh) {
-          const s = 1 + ((t + i * 0.5) % 1.5) * 0.25;
-          mesh.scale.set(s, 1, s);
-        }
-      });
-    }
-  });
-
   if (!visible) return null;
 
   return (
-    <group ref={ringsRef}>
+    <group>
       {disruptions.map((d) => {
         const isSelected = selectedDisruptionId === d.id;
         const [dx, , dz] = geoToWorld(d.coordinates, 0.4);
@@ -52,10 +36,11 @@ export function DisruptionOverlays({
             position={[dx, 0.42, dz]}
             onClick={(e) => {
               e.stopPropagation();
+              if ((e as any).delta > 4) return;
               onSelectDisruption(d);
             }}
           >
-            {/* 1. Subtle Warning Halo Ring */}
+            {/* 1. Subtle Static Warning Halo Ring */}
             <mesh rotation={[-Math.PI / 2, 0, 0]}>
               <ringGeometry args={[1.2, 2.2, 24]} />
               <meshBasicMaterial

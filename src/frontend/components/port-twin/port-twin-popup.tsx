@@ -10,15 +10,9 @@ import {
   Compass,
   ArrowRight,
   ShieldAlert,
-  Clock,
   Activity,
-  Zap,
-  Gauge,
-  Layers,
   AlertTriangle,
   Sparkles,
-  TrendingDown,
-  DollarSign,
 } from "lucide-react";
 import {
   PortTwinBerth,
@@ -55,27 +49,27 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
     switch (status.toLowerCase()) {
       case "available":
       case "normal":
-        return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
       case "occupied":
       case "busy":
       case "berthed":
       case "working":
-        return "bg-cyan-500/15 text-cyan-400 border-cyan-500/30";
+        return "bg-blue-50 text-blue-700 border-blue-200";
       case "approaching":
-        return "bg-blue-500/15 text-blue-400 border-blue-500/30";
+        return "bg-sky-50 text-sky-700 border-sky-200";
       case "waiting":
       case "anchored":
       case "congested":
       case "near capacity":
-        return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+        return "bg-amber-50 text-amber-700 border-amber-200";
       case "critical":
       case "high":
       case "delayed":
       case "maintenance":
       case "failed":
-        return "bg-rose-500/15 text-rose-400 border-rose-500/30";
+        return "bg-rose-50 text-rose-700 border-rose-200";
       default:
-        return "bg-slate-500/15 text-slate-300 border-slate-500/30";
+        return "bg-slate-50 text-slate-700 border-slate-200";
     }
   };
 
@@ -95,33 +89,33 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
   };
 
   return (
-    <div className="absolute top-20 right-4 z-30 w-88 max-w-[calc(100vw-3rem)] rounded-xl border border-slate-200 bg-white/98 p-4 text-slate-800 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-200">
+    <div className="absolute top-16 right-4 z-30 w-84 max-w-[calc(100vw-2.5rem)] rounded-xl border border-slate-200 bg-white/98 p-3.5 text-slate-800 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-150">
       {/* Header */}
-      <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-blue-600 border border-slate-200 shadow-inner">
-            {selection.type === "berth" && <Anchor className="h-4 w-4" />}
-            {selection.type === "vessel" && <Ship className="h-4 w-4" />}
-            {selection.type === "crane" && <Cpu className="h-4 w-4" />}
-            {selection.type === "yard" && <Boxes className="h-4 w-4" />}
-            {selection.type === "anchorage" && <Compass className="h-4 w-4" />}
-            {selection.type === "disruption" && <AlertTriangle className="h-4 w-4 text-rose-500" />}
-            {selection.type === "recommendation" && <Sparkles className="h-4 w-4 text-blue-600" />}
+      <div className="flex items-start justify-between pb-2.5 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-100 text-blue-600 border border-slate-200">
+            {selection.type === "berth" && <Anchor className="h-3.5 w-3.5" />}
+            {selection.type === "vessel" && <Ship className="h-3.5 w-3.5" />}
+            {selection.type === "crane" && <Cpu className="h-3.5 w-3.5" />}
+            {selection.type === "yard" && <Boxes className="h-3.5 w-3.5" />}
+            {selection.type === "anchorage" && <Compass className="h-3.5 w-3.5" />}
+            {selection.type === "disruption" && <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />}
+            {selection.type === "recommendation" && <Sparkles className="h-3.5 w-3.5 text-blue-600" />}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-mono font-semibold tracking-wider text-slate-400 uppercase">
                 {selection.type}
               </span>
               <span
-                className={`inline-flex items-center rounded-full px-2 py-0.2 text-[9px] font-semibold border ${getStatusColor(
+                className={`inline-flex items-center rounded px-1.5 py-0.2 text-[9px] font-bold border ${getStatusColor(
                   (selection.data as any).severity || (selection.data as any).status || "Active"
                 )}`}
               >
                 {(selection.data as any).severity || (selection.data as any).status || "Active"}
               </span>
             </div>
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+            <h3 className="text-xs font-bold text-slate-900 tracking-tight">
               {selection.type === "berth" && `${selection.data.berth_code} — ${selection.data.berth_name}`}
               {selection.type === "vessel" && `${selection.data.vessel_code} · ${selection.data.vessel_name}`}
               {selection.type === "crane" && `${selection.data.crane_code} — ${selection.data.crane_name}`}
@@ -134,56 +128,55 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-          aria-label="Close panel"
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+          aria-label="Close inspector panel"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {/* Content Body */}
-      <div className="py-3 text-xs space-y-2.5">
+      <div className="py-2.5 text-xs space-y-2">
         {/* ================= VESSEL DETAILS ================= */}
         {selection.type === "vessel" && (
           <>
-            {/* Dimensions & TEU */}
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Dimensions (LOA × Beam)</span>
-                <span className="font-semibold text-white font-mono">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Dimensions (LOA × Beam)</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.loa_meters}m × {selection.data.beam_meters}m
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Cargo Capacity</span>
-                <span className="font-semibold text-white font-mono">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Cargo Capacity</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.cargo_teu.toLocaleString()} TEU
                 </span>
               </div>
             </div>
 
-            {/* Operational Progress (for Working Vessels) */}
+            {/* Operational Progress for Working Vessels */}
             {selection.data.status === "Working" && selection.data.moves_total && (
-              <div className="rounded-lg bg-slate-800/70 p-2.5 border border-cyan-500/20">
+              <div className="rounded bg-blue-50/60 p-2 border border-blue-200">
                 <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-slate-300 font-medium flex items-center gap-1.5">
-                    <Activity className="h-3 w-3 text-cyan-400" />
+                  <span className="text-blue-900 font-medium flex items-center gap-1">
+                    <Activity className="h-3 w-3 text-blue-600" />
                     Quayside Cargo Lifts
                   </span>
-                  <span className="font-bold text-cyan-300 font-mono">
+                  <span className="font-bold text-blue-700 font-mono">
                     {Math.round(((selection.data.moves_completed || 0) / selection.data.moves_total) * 100)}%
                   </span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-slate-700/80 overflow-hidden mb-1.5">
+                <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden mb-1">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all"
+                    className="h-full rounded-full bg-blue-600"
                     style={{
                       width: `${((selection.data.moves_completed || 0) / selection.data.moves_total) * 100}%`,
                     }}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                  <span>Completed: {selection.data.moves_completed} moves</span>
+                <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                  <span>Completed: {selection.data.moves_completed}</span>
                   <span>Total: {selection.data.moves_total} moves</span>
                 </div>
               </div>
@@ -191,55 +184,33 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
 
             {/* Delay Alert */}
             {selection.data.status === "Delayed" && (
-              <div className="rounded-lg bg-rose-500/10 p-2.5 border border-rose-500/30 text-[11px] text-rose-300">
-                <div className="flex items-center gap-1.5 font-semibold text-rose-400 mb-1">
-                  <ShieldAlert className="h-3.5 w-3.5" />
-                  <span>Anchorage Congestion Delay</span>
+              <div className="rounded bg-rose-50 p-2 border border-rose-200 text-[11px] text-rose-800">
+                <div className="flex items-center gap-1 font-semibold text-rose-700 mb-0.5">
+                  <ShieldAlert className="h-3 w-3" />
+                  <span>Anchorage Delay Exposure</span>
                 </div>
-                <p className="text-[10px] text-slate-300">
-                  Delay exposure: +{selection.data.delay_hours || 5.5}h beyond scheduled pilot boarding time. Est. demurrage: $6,875.
+                <p className="text-[10px] text-rose-600">
+                  +{selection.data.delay_hours || 5.5}h wait. Estimated demurrage penalty: $6,875.
                 </p>
               </div>
             )}
 
-            {/* Approaching Transit Telemetry */}
-            {selection.data.status === "Approaching" && (
-              <div className="rounded-lg bg-blue-500/10 p-2 border border-blue-500/20 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Current Speed:</span>
-                  <span className="font-bold text-cyan-300 font-mono">{selection.data.speed_knots || 11.8} knots</span>
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-slate-400">Heading:</span>
-                  <span className="font-mono text-slate-200">{selection.data.heading_degrees}° (Fairway Axis)</span>
-                </div>
-              </div>
-            )}
-
             {/* General Specs */}
-            <div className="space-y-1.5 pt-1 text-[11px]">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Liner / Carrier</span>
-                <span className="font-medium text-slate-200">{selection.data.shipping_line}</span>
+            <div className="space-y-1 pt-1 text-[11px]">
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Shipping Line</span>
+                <span className="font-semibold text-slate-800">{selection.data.shipping_line}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Water Draft</span>
-                <span className="font-mono text-slate-200">{selection.data.draft_meters}m</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Water Draft</span>
+                <span className="font-mono text-slate-800">{selection.data.draft_meters}m</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Priority Tier</span>
-                <span className="font-semibold text-amber-400">
-                  Tier {selection.data.priority} {selection.data.priority === 1 ? "(Critical Express)" : ""}
-                </span>
-              </div>
-
-              {/* Related Berth Link */}
               {selection.data.assigned_berth_code && (
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-400">Assigned Berth</span>
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Assigned Berth</span>
                   <button
                     onClick={() => navigateToBerth(selection.data.assigned_berth_code!)}
-                    className="inline-flex items-center gap-1 rounded bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
+                    className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
                   >
                     Berth {selection.data.assigned_berth_code}
                     <ArrowRight className="h-2.5 w-2.5" />
@@ -253,63 +224,65 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         {/* ================= BERTH DETAILS ================= */}
         {selection.type === "berth" && (
           <>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Max LOA</span>
-                <span className="font-semibold text-white font-mono">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Max LOA</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.max_vessel_length}m
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Max Draft</span>
-                <span className="font-semibold text-white font-mono">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Max Draft</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.max_draft}m
                 </span>
               </div>
             </div>
 
-            <div className="space-y-1.5 pt-1 text-[11px]">
-              {/* Connected Vessel */}
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Current Vessel</span>
+            <div className="space-y-1 pt-1 text-[11px]">
+              <div className="flex justify-between items-center py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Assigned Vessel</span>
                 {selection.data.current_vessel_name ? (
                   <button
                     onClick={() => navigateToVessel(selection.data.current_vessel_name!)}
-                    className="inline-flex items-center gap-1 rounded bg-cyan-500/10 px-2 py-0.5 font-bold text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
+                    className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
                   >
                     {selection.data.current_vessel_name}
                     <ArrowRight className="h-2.5 w-2.5" />
                   </button>
                 ) : (
-                  <span className="font-medium text-emerald-400">Clear & Available</span>
+                  <span className="font-bold text-emerald-700">None (Available)</span>
                 )}
               </div>
-
-              {/* Connected Cranes */}
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Assigned Cranes</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Berth Length</span>
+                <span className="font-mono font-semibold text-slate-800">{selection.data.max_vessel_length}m</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Status</span>
+                <span className="font-semibold text-slate-800">{selection.data.status}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Assigned Cranes</span>
                 <div className="flex items-center gap-1">
                   {selection.data.assigned_cranes.map((c) => (
                     <button
                       key={c}
                       onClick={() => navigateToCrane(c)}
-                      className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors"
+                      className="rounded bg-slate-100 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
                     >
                       {c}
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Mooring Bollards</span>
-                <span className="text-slate-300">{selection.data.bollards_count} units (reinforced)</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Mooring Bollards</span>
+                <span className="text-slate-800">{selection.data.bollards_count} reinforced</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Fendering System</span>
-                <span className="text-slate-300 truncate max-w-[140px]" title={selection.data.fender_type}>
-                  {selection.data.fender_type}
-                </span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-slate-500">Fender Type</span>
+                <span className="text-slate-800">{selection.data.fender_type}</span>
               </div>
             </div>
           </>
@@ -318,52 +291,61 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         {/* ================= CRANE DETAILS ================= */}
         {selection.type === "crane" && (
           <>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Rated Throughput</span>
-                <span className="font-semibold text-white font-mono">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Rated Throughput</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.capacity_per_hour} moves/hr
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Shift Completed</span>
-                <span className="font-semibold text-white font-mono">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Completed Lifts</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.current_moves_count} moves
                 </span>
               </div>
             </div>
 
-            <div className="space-y-1.5 pt-1 text-[11px]">
-              {/* Connected Berth */}
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Assigned Berth</span>
+            <div className="space-y-1 pt-1 text-[11px]">
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Utilization</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {selection.data.status === "Failed" ? "0%" : "72%"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Assigned Berth</span>
                 <button
                   onClick={() => navigateToBerth(selection.data.assigned_berth_code)}
-                  className="inline-flex items-center gap-1 rounded bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
+                  className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
                 >
                   Berth {selection.data.assigned_berth_code}
                   <ArrowRight className="h-2.5 w-2.5" />
                 </button>
               </div>
-
-              {/* Working Spreader Activity */}
-              {selection.data.status === "Busy" && (
-                <div className="rounded-lg bg-cyan-500/10 p-2 border border-cyan-500/20 text-[10px] text-cyan-300 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Activity className="h-3 w-3 animate-pulse text-cyan-400" />
-                    Spreader Trolley in Motion
-                  </span>
-                  <span className="font-mono font-bold">~85s cycle</span>
-                </div>
-              )}
-
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Boom Outreach</span>
-                <span className="font-mono text-slate-200">{selection.data.boom_reach_meters}m</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Current Operation</span>
+                <span className="font-semibold text-slate-800">
+                  {selection.data.status === "Failed" ? "Offline" : selection.data.current_moves_count > 0 ? "Loading" : "Standby"}
+                </span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Rail Gauge</span>
-                <span className="font-mono text-slate-200">{selection.data.rail_gauge_meters}m</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Status</span>
+                <span
+                  className={`font-semibold ${
+                    selection.data.status === "Failed" ? "text-rose-600 font-bold" : "text-emerald-700"
+                  }`}
+                >
+                  {selection.data.status}
+                </span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Boom Outreach</span>
+                <span className="font-mono text-slate-800">{selection.data.boom_reach_meters}m</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-slate-500">Rail Gauge</span>
+                <span className="font-mono text-slate-800">{selection.data.rail_gauge_meters}m</span>
               </div>
             </div>
           </>
@@ -372,43 +354,41 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         {/* ================= YARD DETAILS ================= */}
         {selection.type === "yard" && (
           <>
-            <div className="rounded-lg bg-slate-800/60 p-2.5 border border-slate-800">
+            <div className="rounded bg-slate-50 p-2 border border-slate-200">
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-slate-400">Stack Utilization</span>
-                <span className="font-bold text-white font-mono">
+                <span className="text-slate-600 font-semibold">Yard Utilization</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.utilization_pct}%
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-700/80 overflow-hidden">
+              <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    selection.data.utilization_pct > 85
-                      ? "bg-amber-500"
-                      : "bg-cyan-500"
+                    selection.data.utilization_pct > 85 ? "bg-amber-500" : "bg-blue-600"
                   }`}
                   style={{ width: `${selection.data.utilization_pct}%` }}
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5 pt-1 text-[11px]">
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Cargo Type</span>
-                <span className="font-medium text-slate-200">{selection.data.cargo_type}</span>
+            <div className="space-y-1 pt-1 text-[11px]">
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Cargo Classification</span>
+                <span className="font-semibold text-slate-800">{selection.data.cargo_type}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Occupied / Capacity</span>
-                <span className="font-mono text-slate-200">
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Occupied / Total</span>
+                <span className="font-mono text-slate-800">
                   {selection.data.occupied_capacity_teu.toLocaleString()} / {selection.data.total_capacity_teu.toLocaleString()} TEU
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Stacking Tiers</span>
-                <span className="font-mono text-slate-200">{selection.data.stacking_tiers} high</span>
+              <div className="flex justify-between py-0.5 border-b border-slate-100">
+                <span className="text-slate-500">Stacking Tiers</span>
+                <span className="font-mono text-slate-800">{selection.data.stacking_tiers} high</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">RTG Gantry Cranes</span>
-                <span className="text-slate-200">{selection.data.rtg_cranes_count} units</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-slate-500">RTG Cranes Active</span>
+                <span className="text-slate-800 font-mono">{selection.data.rtg_cranes_count} units</span>
               </div>
             </div>
           </>
@@ -417,16 +397,16 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         {/* ================= ANCHORAGE DETAILS ================= */}
         {selection.type === "anchorage" && (
           <>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Water Depth</span>
-                <span className="font-semibold text-white font-mono">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Water Depth</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.water_depth_meters}m
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-800/60 p-2 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Vessels Anchored</span>
-                <span className="font-semibold text-white font-mono">
+              <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                <span className="text-slate-500 block text-[9px] uppercase font-semibold">Capacity Occupied</span>
+                <span className="font-bold text-slate-900 font-mono">
                   {selection.data.current_vessels_count} / {selection.data.max_capacity}
                 </span>
               </div>
@@ -434,164 +414,80 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
           </>
         )}
 
-        {/* ================= DISRUPTION DETAILS (PHASE 3) ================= */}
+        {/* ================= DISRUPTION DETAILS ================= */}
         {selection.type === "disruption" && (
           <>
-            <div className="space-y-2 text-[11px]">
-              <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 p-2.5">
-                <div className="flex items-center justify-between text-[10px] text-rose-300 font-mono mb-1">
-                  <span>DISRUPTION SENTINEL ALERT</span>
+            <div className="space-y-1.5 text-[11px]">
+              <div className="rounded bg-rose-50 border border-rose-200 p-2">
+                <div className="flex items-center justify-between text-[9px] text-rose-700 font-mono font-bold mb-0.5">
+                  <span>DISRUPTION SENTINEL</span>
                   <span>{selection.data.incident_type.toUpperCase()}</span>
                 </div>
-                <p className="text-slate-200 text-xs leading-relaxed">{selection.data.description}</p>
+                <p className="text-slate-700 text-[11px] leading-relaxed">{selection.data.description}</p>
               </div>
 
-              {/* Financial Risk & Delay Impact */}
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-lg bg-slate-800/80 p-2 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">Risk Exposure</span>
-                  <span className="font-bold text-rose-400 font-mono text-sm">
-                    ${selection.data.estimated_risk_usd.toLocaleString()} USD
+              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Financial Risk</span>
+                  <span className="font-bold text-rose-700 font-mono">
+                    ${selection.data.estimated_risk_usd.toLocaleString()}
                   </span>
                 </div>
-                <div className="rounded-lg bg-slate-800/80 p-2 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">Delay Impact</span>
-                  <span className="font-bold text-amber-400 font-mono text-sm">
+                <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Delay Impact</span>
+                  <span className="font-bold text-amber-700 font-mono">
                     +{selection.data.estimated_delay_hours}h
                   </span>
                 </div>
               </div>
 
-              {/* Affected Assets Cross-Navigation */}
-              <div className="space-y-1 pt-1">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">
-                  Affected Terminal Assets
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selection.data.affected_vessel_names.map((vName) => (
-                    <button
-                      key={vName}
-                      onClick={() => navigateToVessel(vName)}
-                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-[10px] text-cyan-300 border border-slate-700 hover:bg-slate-700 hover:border-cyan-500/50 transition-colors"
-                    >
-                      <Ship className="h-3 w-3" />
-                      <span>{vName}</span>
-                    </button>
-                  ))}
-                  {selection.data.affected_berth_codes.map((bCode) => (
-                    <button
-                      key={bCode}
-                      onClick={() => navigateToBerth(bCode)}
-                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-[10px] text-emerald-300 border border-slate-700 hover:bg-slate-700 hover:border-emerald-500/50 transition-colors"
-                    >
-                      <Anchor className="h-3 w-3" />
-                      <span>{bCode}</span>
-                    </button>
-                  ))}
-                  {selection.data.affected_crane_codes.map((cCode) => (
-                    <button
-                      key={cCode}
-                      onClick={() => navigateToCrane(cCode)}
-                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-[10px] text-blue-300 border border-slate-700 hover:bg-slate-700 hover:border-blue-500/50 transition-colors"
-                    >
-                      <Cpu className="h-3 w-3" />
-                      <span>{cCode}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recommended Action */}
-              <div className="rounded-lg bg-cyan-950/40 border border-cyan-500/30 p-2 text-cyan-200 text-[11px]">
-                <span className="font-semibold block text-[10px] text-cyan-400 mb-0.5">ASTRA Sentinel Recommendation</span>
-                <span>{selection.data.recommended_action}</span>
+              <div className="rounded bg-blue-50/50 p-1.5 border border-blue-200 text-[10px]">
+                <span className="font-bold text-blue-900 block mb-0.5">Mitigation Protocol:</span>
+                <p className="text-slate-700">{selection.data.recommended_action}</p>
               </div>
             </div>
           </>
         )}
 
-        {/* ================= RECOMMENDATION DETAILS (PHASE 3) ================= */}
+        {/* ================= RECOMMENDATION DETAILS ================= */}
         {selection.type === "recommendation" && (
           <>
-            <div className="space-y-2 text-[11px]">
-              <div className="rounded-lg bg-cyan-500/10 border border-cyan-500/30 p-2.5">
-                <div className="flex items-center justify-between text-[10px] text-cyan-300 font-mono mb-1">
-                  <span>OR-TOOLS CP-SAT PROPOSED PLAN</span>
-                  <span className="text-emerald-400 font-bold">SOLVER OPTIMAL</span>
+            <div className="space-y-1.5 text-[11px]">
+              <div className="rounded bg-blue-50 border border-blue-200 p-2">
+                <div className="flex items-center justify-between text-[9px] text-blue-700 font-mono font-bold mb-0.5">
+                  <span>OR-TOOLS RECOMMENDED HOT-SWAP</span>
+                  <span>72H HORIZON</span>
                 </div>
-                <div className="flex items-center justify-between pt-1 font-semibold text-white">
-                  <span>{selection.data.vessel_name}</span>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-slate-400 line-through">
-                      {selection.data.current_berth_code || "Anchorage"}
-                    </span>
-                    <ArrowRight className="h-3 w-3 text-cyan-400" />
-                    <span className="text-cyan-300 font-mono font-bold">
-                      {selection.data.proposed_berth_code}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-slate-700 text-[11px] leading-relaxed">{selection.data.assignment_rationale}</p>
               </div>
 
-              {/* Savings Meter */}
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-lg bg-emerald-950/30 p-2 border border-emerald-500/30">
-                  <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
-                    <DollarSign className="h-3 w-3" />
-                    <span>Demurrage Saved</span>
-                  </div>
-                  <span className="font-bold text-emerald-300 font-mono text-sm">
+              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Demurrage Savings</span>
+                  <span className="font-bold text-emerald-700 font-mono">
                     +${selection.data.demurrage_savings_usd.toLocaleString()}
                   </span>
                 </div>
-                <div className="rounded-lg bg-blue-950/30 p-2 border border-blue-500/30">
-                  <div className="flex items-center gap-1 text-[10px] text-blue-400 font-mono">
-                    <TrendingDown className="h-3 w-3" />
-                    <span>Wait Reduction</span>
-                  </div>
-                  <span className="font-bold text-blue-300 font-mono text-sm">
-                    -{selection.data.waiting_reduction_hours}h
+                <div className="rounded bg-slate-50 p-1.5 border border-slate-200">
+                  <span className="text-slate-500 block text-[9px] uppercase font-semibold">Queue Reduction</span>
+                  <span className="font-bold text-blue-700 font-mono">
+                    -{selection.data.waiting_reduction_hours}h wait
                   </span>
                 </div>
-              </div>
-
-              {/* Optimization Rationale */}
-              <div className="rounded-lg bg-slate-800/70 p-2 border border-slate-800 text-slate-300">
-                <span className="font-semibold block text-[10px] text-slate-400 mb-0.5">Algorithm Rationale</span>
-                <span>{selection.data.rationale}</span>
-              </div>
-
-              {/* Assigned Cranes & Quick Jump */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-400 text-[10px]">Cranes:</span>
-                  {selection.data.assigned_crane_codes.map((cc) => (
-                    <button
-                      key={cc}
-                      onClick={() => navigateToCrane(cc)}
-                      className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-300 border border-slate-700 hover:border-blue-400"
-                    >
-                      {cc}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => navigateToBerth(selection.data.proposed_berth_code)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-cyan-500/20 px-2 py-1 text-[10px] font-semibold text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition-colors"
-                >
-                  <span>Inspect {selection.data.proposed_berth_code}</span>
-                  <ArrowRight className="h-3 w-3" />
-                </button>
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Footer Info */}
-      <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-        <span>ASTRA OPERATIONAL INTELLIGENCE</span>
-        <span className="text-cyan-400/80">PHASE 3 ACTIVE</span>
+      {/* Action Footer */}
+      <div className="pt-2 border-t border-slate-100">
+        <button
+          onClick={onClose}
+          className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-semibold text-center transition-colors shadow-sm cursor-pointer"
+        >
+          View Details
+        </button>
       </div>
     </div>
   );

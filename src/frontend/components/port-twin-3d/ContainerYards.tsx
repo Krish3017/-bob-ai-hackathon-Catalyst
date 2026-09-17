@@ -10,6 +10,7 @@ interface ContainerYardsProps {
   yards: PortTwinYard[];
   selectedYardId?: string | null;
   onSelectYard: (yard: PortTwinYard) => void;
+  onHoverYard?: (yard: PortTwinYard | null, x?: number, y?: number) => void;
   visible?: boolean;
 }
 
@@ -28,6 +29,7 @@ export function ContainerYards({
   yards,
   selectedYardId,
   onSelectYard,
+  onHoverYard,
   visible = true,
 }: ContainerYardsProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -70,16 +72,23 @@ export function ContainerYards({
             key={yard.id}
             onClick={(e) => {
               e.stopPropagation();
+              if ((e as any).delta > 4) return;
               onSelectYard(yard);
             }}
             onPointerOver={(e) => {
               e.stopPropagation();
               setHoveredId(yard.id);
               document.body.style.cursor = "pointer";
+              onHoverYard?.(yard, e.clientX, e.clientY);
+            }}
+            onPointerMove={(e) => {
+              e.stopPropagation();
+              onHoverYard?.(yard, e.clientX, e.clientY);
             }}
             onPointerOut={() => {
               setHoveredId(null);
               document.body.style.cursor = "auto";
+              onHoverYard?.(null);
             }}
           >
             {/* 1. Yard Base Pad (Clean light gray pavement) */}
@@ -149,17 +158,18 @@ export function ContainerYards({
             </group>
 
             {/* 4. Compact White GIS Yard Tag Badge */}
+            {/* 4. Compact White GIS Yard Marker Badge */}
             <Html
-              position={[cx, 3.2, cz]}
+              position={[cx, 2.5, cz]}
               center
               distanceFactor={85}
               zIndexRange={[10, 0]}
               style={{ pointerEvents: "none" }}
             >
               <div
-                className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none ${
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none ${
                   isSelected
-                    ? "bg-slate-900 border-2 border-blue-500 text-white shadow-md scale-105"
+                    ? "bg-slate-900 border border-blue-500 text-white shadow-md"
                     : isHovered
                     ? "bg-white border border-blue-500 text-blue-900 shadow"
                     : "bg-white/95 border border-slate-300 text-slate-700"
@@ -170,9 +180,6 @@ export function ContainerYards({
                   style={{ backgroundColor: utilColor }}
                 />
                 <span>{yard.yard_code}</span>
-                <span className="text-[8px] text-slate-500 font-sans font-normal">
-                  {yard.utilization_pct}% TEU
-                </span>
               </div>
             </Html>
           </group>

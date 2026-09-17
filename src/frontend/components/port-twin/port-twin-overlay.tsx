@@ -6,7 +6,12 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Compass,
+  Minimize2,
+  Crosshair,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   Radio,
   Eye,
   EyeOff,
@@ -17,11 +22,7 @@ import {
   Navigation,
   ChevronDown,
   ChevronUp,
-  Play,
-  Pause,
-  RotateCcw,
-  Clock,
-  Activity,
+  Compass,
   AlertTriangle,
   Zap,
 } from "lucide-react";
@@ -46,14 +47,20 @@ interface PortTwinOverlayProps {
   onResetView: () => void;
   onTogglePitch: () => void;
   is25DPitch: boolean;
-  // Simulation Controls
-  isPlaying: boolean;
-  onTogglePlay: () => void;
-  simSpeed: 1 | 2 | 5;
-  onChangeSpeed: (speed: 1 | 2 | 5) => void;
-  onResetSimulation: () => void;
-  simClock: string;
-  activeTransitCount: number;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  onPanUp?: () => void;
+  onPanDown?: () => void;
+  onPanLeft?: () => void;
+  onPanRight?: () => void;
+  // Optional legacy props for backwards compatibility
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
+  simSpeed?: 1 | 2 | 5;
+  onChangeSpeed?: (speed: any) => void;
+  onResetSimulation?: () => void;
+  simClock?: string;
+  activeTransitCount?: number;
   stats: {
     totalVessels: number;
     berthedVessels: number;
@@ -74,13 +81,12 @@ export function PortTwinOverlay({
   onResetView,
   onTogglePitch,
   is25DPitch,
-  isPlaying,
-  onTogglePlay,
-  simSpeed,
-  onChangeSpeed,
-  onResetSimulation,
-  simClock,
-  activeTransitCount,
+  isFullscreen,
+  onToggleFullscreen,
+  onPanUp,
+  onPanDown,
+  onPanLeft,
+  onPanRight,
   stats,
 }: PortTwinOverlayProps) {
   const [layersOpen, setLayersOpen] = useState(false);
@@ -142,70 +148,68 @@ export function PortTwinOverlay({
         </div>
       </div>
 
-      {/* 2. SIMULATION CONTROLS DECK (Top-Center) */}
-      <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-sm text-xs text-slate-800">
-          {/* Play / Pause Toggle */}
-          <button
-            onClick={onTogglePlay}
-            className={`flex h-6 w-6 items-center justify-center rounded font-semibold transition-all ${
-              isPlaying
-                ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700"
-                : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200"
-            }`}
-            title={isPlaying ? "Pause Simulation" : "Play Simulation"}
-            aria-label={isPlaying ? "Pause Simulation" : "Start Simulation"}
-          >
-            {isPlaying ? <Pause className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 ml-0.5 fill-current" />}
-          </button>
+      {/* 2. CAMERA & PAN NAVIGATION CONTROLS (Bottom-Right) */}
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-1.5 pointer-events-auto">
+        {/* Directional Pan Cross & Recenter */}
+        <div className="rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-md backdrop-blur-sm">
+          <div className="grid grid-cols-3 gap-0.5">
+            {/* Top row */}
+            <div />
+            <button
+              onClick={onPanUp}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-700 hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all"
+              title="Pan North / Up (Arrow Up)"
+              aria-label="Pan Up"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <div />
 
-          {/* Reset Route */}
-          <button
-            onClick={onResetSimulation}
-            className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors"
-            title="Reset Vessels to Route Start"
-            aria-label="Reset Route"
-          >
-            <RotateCcw className="h-2.5 w-2.5" />
-          </button>
+            {/* Middle row */}
+            <button
+              onClick={onPanLeft}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-700 hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all"
+              title="Pan West / Left (Arrow Left)"
+              aria-label="Pan Left"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={onResetView}
+              className="flex h-7 w-7 items-center justify-center rounded bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 active:scale-95 transition-all"
+              title="Recenter / Reset Full-Port Overview"
+              aria-label="Recenter View"
+            >
+              <Crosshair className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onPanRight}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-700 hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all"
+              title="Pan East / Right (Arrow Right)"
+              aria-label="Pan Right"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
 
-          <div className="h-3.5 w-px bg-slate-200" />
-
-          {/* Speed Multipliers */}
-          <div className="flex items-center gap-0.5 rounded bg-slate-100 p-0.5 border border-slate-200">
-            {([1, 2, 5] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => onChangeSpeed(s)}
-                className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold transition-colors ${
-                  simSpeed === s
-                    ? "bg-white text-blue-700 shadow-sm border border-slate-200"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                {s}x
-              </button>
-            ))}
-          </div>
-
-          <div className="h-3.5 w-px bg-slate-200" />
-
-          {/* Simulated Clock */}
-          <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-600">
-            <Clock className="h-3 w-3 text-blue-600" />
-            <span className="font-bold text-slate-900">{simClock}</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-blue-700 font-semibold">{activeTransitCount} in transit</span>
+            {/* Bottom row */}
+            <div />
+            <button
+              onClick={onPanDown}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-700 hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all"
+              title="Pan South / Down (Arrow Down)"
+              aria-label="Pan Down"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+            <div />
           </div>
         </div>
-      </div>
 
-      {/* 3. CAMERA CONTROLS (Bottom-Right) */}
-      <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-1.5">
-        <div className="flex flex-col rounded-lg border border-slate-200/90 bg-white/95 shadow-md backdrop-blur-sm overflow-hidden text-slate-700">
+        {/* Zoom, Fullscreen, and View Options Toolbar */}
+        <div className="flex items-center rounded-lg border border-slate-200/90 bg-white/95 shadow-md backdrop-blur-sm overflow-hidden text-slate-700">
           <button
             onClick={onZoomIn}
-            className="flex h-8 w-8 items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition-colors border-b border-slate-100"
+            className="flex h-7 w-8 items-center justify-center hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all border-r border-slate-100"
             title="Zoom In"
             aria-label="Zoom In"
           >
@@ -213,29 +217,31 @@ export function PortTwinOverlay({
           </button>
           <button
             onClick={onZoomOut}
-            className="flex h-8 w-8 items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition-colors border-b border-slate-100"
+            className="flex h-7 w-8 items-center justify-center hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all border-r border-slate-100"
             title="Zoom Out"
             aria-label="Zoom Out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
           <button
+            onClick={onToggleFullscreen}
+            className={`flex h-7 w-8 items-center justify-center hover:bg-slate-100 hover:text-blue-700 active:scale-95 transition-all border-r border-slate-100 ${
+              isFullscreen ? "bg-blue-50 text-blue-700 font-bold" : ""
+            }`}
+            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Expand Map Fullscreen"}
+            aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen Map"}
+          >
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>
+          <button
             onClick={onTogglePitch}
-            className={`flex h-8 w-8 items-center justify-center transition-colors border-b border-slate-100 ${
-              is25DPitch ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-100"
+            className={`flex h-7 w-8 items-center justify-center transition-all ${
+              is25DPitch ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-100 hover:text-blue-700"
             }`}
             title={is25DPitch ? "2.5D Aerial Tilt Active" : "Top-down 2D View"}
             aria-label="Toggle 2.5D Aerial Tilt"
           >
             <Layers className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onResetView}
-            className="flex h-8 w-8 items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition-colors"
-            title="Reset to Port Overview"
-            aria-label="Reset View"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
