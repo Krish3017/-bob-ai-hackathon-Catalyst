@@ -14,7 +14,6 @@ interface STSCranesProps {
   visible?: boolean;
 }
 
-// Single animated STS Container Crane Sub-component
 function SingleSTSCrane({
   crane,
   isSelected,
@@ -27,37 +26,34 @@ function SingleSTSCrane({
   const [hovered, setHovered] = useState(false);
   const trolleyRef = useRef<THREE.Group>(null);
 
-  const [cx, , cz] = geoToWorld(crane.coordinates, 2.5);
+  const [cx, , cz] = geoToWorld(crane.coordinates, 0.4);
 
   const isFailed = crane.status === "Failed";
   const isMaint = crane.status === "Maintenance";
   const isBusy = crane.status === "Busy";
 
   const statusColor = isFailed
-    ? "#f43f5e"
+    ? "#ef4444"
     : isMaint
     ? "#f59e0b"
     : isBusy
-    ? "#38bdf8"
+    ? "#2563eb"
     : "#10b981";
 
-  // Boom rotation angle: Quay wall runs roughly at angle -0.34 rad (-19.5 deg).
-  // Boom reaches outward towards the sea (+Z / South-East direction).
   const craneRotation = -0.34;
 
-  // Animate trolley and spreader hoist back and forth along boom if crane is busy
+  // Subtle spreader trolley translation along boom arm
   useFrame(({ clock }) => {
     if (trolleyRef.current && isBusy && !isFailed) {
-      const t = clock.getElapsedTime() * 0.8;
-      // Trolley moves along local Z axis from landside (-2) to seaside (+6)
-      const offset = Math.sin(t) * 3.5 + 2.0;
+      const t = clock.getElapsedTime() * 0.7;
+      const offset = Math.sin(t) * 2.8 + 1.8;
       trolleyRef.current.position.z = offset;
     }
   });
 
   return (
     <group
-      position={[cx, 2.5, cz]}
+      position={[cx, 0.4, cz]}
       rotation={[0, craneRotation, 0]}
       onClick={(e) => {
         e.stopPropagation();
@@ -73,152 +69,130 @@ function SingleSTSCrane({
         document.body.style.cursor = "auto";
       }}
     >
-      {/* 1. Gantry Wheel Rail Carriages (4 corner bogies) */}
+      {/* 1. Gantry Wheel Carriages */}
       {[
-        [-1.6, -1.8],
-        [1.6, -1.8],
-        [-1.6, 1.8],
-        [1.6, 1.8],
+        [-1.4, -1.6],
+        [1.4, -1.6],
+        [-1.4, 1.6],
+        [1.4, 1.6],
       ].map(([wx, wz], idx) => (
-        <mesh key={idx} position={[wx, 0.2, wz]} castShadow>
-          <boxGeometry args={[0.5, 0.4, 0.9]} />
-          <meshStandardMaterial color="#0f172a" metalness={0.9} roughness={0.2} />
+        <mesh key={idx} position={[wx, 0.12, wz]}>
+          <boxGeometry args={[0.4, 0.25, 0.7]} />
+          <meshStandardMaterial color="#475569" metalness={0.6} />
         </mesh>
       ))}
 
-      {/* 2. Gantry Portal Legs (A-frame structure) */}
-      {/* Landside A-frame */}
-      <group position={[0, 0, -1.8]}>
-        <mesh position={[-1.2, 4.0, 0]} rotation={[0, 0, -0.15]} castShadow>
-          <boxGeometry args={[0.4, 8.2, 0.4]} />
-          <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
+      {/* 2. Gantry Portal Legs (Crisp White / Steel Grey Marine Architecture) */}
+      <group position={[0, 0, -1.6]}>
+        <mesh position={[-1.1, 3.2, 0]} rotation={[0, 0, -0.14]}>
+          <boxGeometry args={[0.3, 6.4, 0.3]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.3} metalness={0.2} />
         </mesh>
-        <mesh position={[1.2, 4.0, 0]} rotation={[0, 0, 0.15]} castShadow>
-          <boxGeometry args={[0.4, 8.2, 0.4]} />
-          <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
+        <mesh position={[1.1, 3.2, 0]} rotation={[0, 0, 0.14]}>
+          <boxGeometry args={[0.3, 6.4, 0.3]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.3} metalness={0.2} />
         </mesh>
-        {/* Horizontal tie beam */}
-        <mesh position={[0, 7.8, 0]} castShadow>
-          <boxGeometry args={[3.2, 0.4, 0.4]} />
-          <meshStandardMaterial color="#475569" metalness={0.7} />
+        <mesh position={[0, 6.2, 0]}>
+          <boxGeometry args={[2.6, 0.3, 0.3]} />
+          <meshStandardMaterial color="#cbd5e1" />
         </mesh>
       </group>
 
-      {/* Seaside A-frame */}
-      <group position={[0, 0, 1.8]}>
-        <mesh position={[-1.2, 4.0, 0]} rotation={[0, 0, -0.15]} castShadow>
-          <boxGeometry args={[0.4, 8.2, 0.4]} />
-          <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
+      <group position={[0, 0, 1.6]}>
+        <mesh position={[-1.1, 3.2, 0]} rotation={[0, 0, -0.14]}>
+          <boxGeometry args={[0.3, 6.4, 0.3]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.3} metalness={0.2} />
         </mesh>
-        <mesh position={[1.2, 4.0, 0]} rotation={[0, 0, 0.15]} castShadow>
-          <boxGeometry args={[0.4, 8.2, 0.4]} />
-          <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
+        <mesh position={[1.1, 3.2, 0]} rotation={[0, 0, 0.14]}>
+          <boxGeometry args={[0.3, 6.4, 0.3]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.3} metalness={0.2} />
         </mesh>
-        {/* Horizontal tie beam */}
-        <mesh position={[0, 7.8, 0]} castShadow>
-          <boxGeometry args={[3.2, 0.4, 0.4]} />
-          <meshStandardMaterial color="#475569" metalness={0.7} />
+        <mesh position={[0, 6.2, 0]}>
+          <boxGeometry args={[2.6, 0.3, 0.3]} />
+          <meshStandardMaterial color="#cbd5e1" />
         </mesh>
       </group>
 
-      {/* Side cross bracing between legs */}
-      <mesh position={[-1.4, 4.5, 0]} rotation={[0.45, 0, 0]}>
-        <boxGeometry args={[0.2, 0.2, 4.2]} />
-        <meshStandardMaterial color="#334155" />
-      </mesh>
-      <mesh position={[1.4, 4.5, 0]} rotation={[-0.45, 0, 0]}>
-        <boxGeometry args={[0.2, 0.2, 4.2]} />
-        <meshStandardMaterial color="#334155" />
+      {/* 3. Machinery House & Operator Cab */}
+      <mesh position={[0, 6.8, -1.0]}>
+        <boxGeometry args={[2.0, 1.0, 1.8]} />
+        <meshStandardMaterial color={isFailed ? "#ef4444" : "#e2e8f0"} roughness={0.4} />
       </mesh>
 
-      {/* 3. Machinery House & Operator Cab (top girder level) */}
-      <mesh position={[0, 8.4, -1.2]} castShadow>
-        <boxGeometry args={[2.4, 1.2, 2.2]} />
-        <meshStandardMaterial color={isFailed ? "#f43f5e" : "#1e293b"} metalness={0.5} />
+      {/* 4. Upper Tower Apex */}
+      <mesh position={[0, 8.2, -0.2]}>
+        <boxGeometry args={[1.3, 1.8, 0.4]} />
+        <meshStandardMaterial color="#cbd5e1" />
       </mesh>
 
-      {/* 4. Upper Tower Apex & Stay Cables */}
-      <mesh position={[0, 10.2, -0.2]} castShadow>
-        <boxGeometry args={[1.6, 2.4, 0.5]} />
-        <meshStandardMaterial color="#475569" />
-      </mesh>
-
-      {/* 5. Horizontal Boom Arm Extending Over Water (Length ~14 units) */}
-      <mesh position={[0, 8.2, 3.8]} castShadow>
-        <boxGeometry args={[0.9, 0.6, 13.5]} />
+      {/* 5. Horizontal Boom Arm Extending Outward Over Water */}
+      <mesh position={[0, 6.6, 3.2]}>
+        <boxGeometry args={[0.7, 0.45, 11.5]} />
         <meshStandardMaterial
-          color={isFailed ? "#f43f5e" : hovered ? "#38bdf8" : "#94a3b8"}
-          metalness={0.6}
+          color={isFailed ? "#ef4444" : hovered ? "#2563eb" : "#f1f5f9"}
+          roughness={0.3}
+          metalness={0.3}
         />
       </mesh>
 
-      {/* Back-reach Counterweight Arm */}
-      <mesh position={[0, 8.2, -3.8]} castShadow>
-        <boxGeometry args={[0.9, 0.6, 4.5]} />
-        <meshStandardMaterial color="#475569" />
+      {/* Back-reach Arm */}
+      <mesh position={[0, 6.6, -3.2]}>
+        <boxGeometry args={[0.7, 0.45, 3.8]} />
+        <meshStandardMaterial color="#cbd5e1" />
       </mesh>
 
-      {/* 6. Dynamic Trolley & Spreader Holding Container */}
-      <group ref={trolleyRef} position={[0, 7.7, 3.5]}>
-        {/* Trolley Carriage */}
-        <mesh castShadow>
-          <boxGeometry args={[1.2, 0.35, 1.1]} />
-          <meshStandardMaterial color="#0f172a" metalness={0.9} />
+      {/* 6. Trolley & Spreader Holding Container */}
+      <group ref={trolleyRef} position={[0, 6.2, 3.0]}>
+        <mesh>
+          <boxGeometry args={[0.9, 0.25, 0.9]} />
+          <meshStandardMaterial color="#334155" />
         </mesh>
-        {/* Hoist Steel Cables */}
-        <mesh position={[-0.4, -1.2, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 2.4]} />
-          <meshBasicMaterial color="#94a3b8" />
+        {/* Steel cables */}
+        <mesh position={[-0.3, -0.8, 0]}>
+          <cylinderGeometry args={[0.015, 0.015, 1.6]} />
+          <meshBasicMaterial color="#64748b" />
         </mesh>
-        <mesh position={[0.4, -1.2, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 2.4]} />
-          <meshBasicMaterial color="#94a3b8" />
+        <mesh position={[0.3, -0.8, 0]}>
+          <cylinderGeometry args={[0.015, 0.015, 1.6]} />
+          <meshBasicMaterial color="#64748b" />
         </mesh>
-        {/* Spreader Frame */}
-        <mesh position={[0, -2.4, 0]} castShadow>
-          <boxGeometry args={[1.4, 0.25, 2.8]} />
-          <meshStandardMaterial color="#eab308" metalness={0.4} />
+        {/* Spreader */}
+        <mesh position={[0, -1.6, 0]}>
+          <boxGeometry args={[1.1, 0.18, 2.2]} />
+          <meshStandardMaterial color="#d97706" />
         </mesh>
-        {/* Container being lifted (if busy) */}
         {isBusy && !isFailed && (
-          <mesh position={[0, -3.1, 0]} castShadow>
-            <boxGeometry args={[1.2, 1.0, 2.6]} />
-            <meshStandardMaterial color={statusColor} roughness={0.4} />
+          <mesh position={[0, -2.1, 0]}>
+            <boxGeometry args={[0.95, 0.75, 2.0]} />
+            <meshStandardMaterial color="#1e3a8a" roughness={0.4} />
           </mesh>
         )}
       </group>
 
-      {/* 7. Operational Status Beacon Light */}
-      <pointLight position={[0, 11.5, -0.2]} color={statusColor} intensity={2.5} distance={15} />
-      <mesh position={[0, 11.5, -0.2]}>
-        <sphereGeometry args={[0.2, 8, 8]} />
-        <meshBasicMaterial color={statusColor} />
-      </mesh>
-
-      {/* 8. STS Crane Label HUD */}
+      {/* 7. Compact White GIS Crane Tag */}
       <Html
-        position={[0, 12.8, 0]}
+        position={[0, 9.6, 0]}
         center
-        distanceFactor={75}
+        distanceFactor={80}
         zIndexRange={[10, 0]}
         style={{ pointerEvents: "none" }}
       >
         <div
-          className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-mono font-bold shadow-2xl backdrop-blur-md transition-all select-none ${
+          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none ${
             isSelected
-              ? "bg-slate-900 border-2 border-white text-white ring-2 ring-cyan-400 scale-110"
+              ? "bg-slate-900 border-2 border-blue-500 text-white shadow-md scale-105"
               : hovered
-              ? "bg-slate-900/95 border border-cyan-400 text-cyan-200"
-              : "bg-slate-950/90 border border-slate-700/80 text-slate-200"
+              ? "bg-white border border-blue-500 text-blue-900 shadow"
+              : "bg-white/95 border border-slate-300 text-slate-700"
           }`}
         >
           <span
-            className="h-1.5 w-1.5 rounded-full animate-pulse"
+            className="h-1.5 w-1.5 rounded-full"
             style={{ backgroundColor: statusColor }}
           />
           <span>{crane.crane_code}</span>
           {isFailed && (
-            <span className="text-[8px] text-rose-400 font-bold uppercase">FAIL</span>
+            <span className="text-[7px] text-rose-600 font-bold uppercase">ERR</span>
           )}
         </div>
       </Html>

@@ -23,13 +23,13 @@ const PortTwin3DMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[740px] w-full flex-col items-center justify-center rounded-2xl border border-slate-800 bg-[#040911] text-slate-300">
-        <Loader2 className="h-9 w-9 animate-spin text-cyan-400 mb-3" />
-        <span className="font-mono text-xs tracking-wider uppercase text-cyan-300">
-          Initializing 3D Port Digital Twin Engine...
+      <div className="flex h-[640px] w-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-[#dbeafe] text-slate-700 shadow-sm">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+        <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-800">
+          Loading Port Digital Twin GIS...
         </span>
         <span className="text-[11px] text-slate-500 mt-1">
-          Assembling WebGL nautical terrain, quayside berths, STS cranes, container stacks & fleet
+          Rendering nautical bathymetry, fairway boundaries, and quayside infrastructure
         </span>
       </div>
     ),
@@ -53,15 +53,15 @@ export default function PortTwinPage() {
               <span className="text-xs font-semibold uppercase tracking-wider text-[#004741]">
                 Nautical Command Center
               </span>
-              <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-700 border border-cyan-500/20">
-                Phase 1 Foundation
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                GIS Operational Twin
               </span>
             </div>
             <h1 className="text-xl font-bold text-[#102A27]">
               Live Port Digital Twin
             </h1>
             <p className="text-xs text-[#5C6B68]">
-              Interactive 2.5D visual twin modeling berths, STS cranes, container yards, and anchorage fleet movements.
+              Interactive 2.5D maritime operations twin modeling berths, STS cranes, container yards, and fleet movements.
             </p>
           </div>
 
@@ -78,16 +78,14 @@ export default function PortTwinPage() {
               href="/optimization"
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#004741] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#003B36] transition-colors"
             >
-              <Zap className="h-3.5 w-3.5 text-cyan-300" />
+              <Zap className="h-3.5 w-3.5 text-emerald-300" />
               <span>72h Optimization</span>
             </Link>
           </div>
         </div>
 
-        {/* 3D Digital Twin Viewport */}
-        <div className="w-full h-[760px] rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-[#040911]">
-          <PortTwin3DMap />
-        </div>
+        {/* Port Digital Twin GIS Map & Intelligence Layout */}
+        <PortTwin3DMap />
       </div>
     </AppShell>
   );

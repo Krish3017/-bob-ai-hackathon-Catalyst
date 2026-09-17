@@ -20,16 +20,16 @@ export function DisruptionOverlays({
   onSelectDisruption,
   visible = true,
 }: DisruptionOverlaysProps) {
-  const radarGroupRef = useRef<THREE.Group>(null);
+  const ringsRef = useRef<THREE.Group>(null);
 
-  // Pulse animation for hazard rings
+  // Subtle warning ring pulse
   useFrame(({ clock }) => {
-    if (radarGroupRef.current) {
-      const t = clock.getElapsedTime() * 2;
-      radarGroupRef.current.children.forEach((child, i) => {
+    if (ringsRef.current) {
+      const t = clock.getElapsedTime() * 1.5;
+      ringsRef.current.children.forEach((child, i) => {
         const mesh = child as THREE.Mesh;
         if (mesh.isMesh) {
-          const s = 1 + ((t + i * 0.7) % 2) * 0.6;
+          const s = 1 + ((t + i * 0.5) % 1.5) * 0.25;
           mesh.scale.set(s, 1, s);
         }
       });
@@ -39,66 +39,61 @@ export function DisruptionOverlays({
   if (!visible) return null;
 
   return (
-    <group ref={radarGroupRef}>
+    <group ref={ringsRef}>
       {disruptions.map((d) => {
         const isSelected = selectedDisruptionId === d.id;
-        const [dx, , dz] = geoToWorld(d.coordinates, 2.5);
+        const [dx, , dz] = geoToWorld(d.coordinates, 0.4);
         const isCritical = d.severity === "Critical";
-        const ringColor = isCritical ? "#f43f5e" : "#f59e0b";
+        const ringColor = isCritical ? "#ef4444" : "#f59e0b";
 
         return (
           <group
             key={d.id}
-            position={[dx, 2.6, dz]}
+            position={[dx, 0.42, dz]}
             onClick={(e) => {
               e.stopPropagation();
               onSelectDisruption(d);
             }}
           >
-            {/* 1. Pulsing Hazard Radar Disk */}
+            {/* 1. Subtle Warning Halo Ring */}
             <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[1.5, 3.8, 32]} />
+              <ringGeometry args={[1.2, 2.2, 24]} />
               <meshBasicMaterial
                 color={ringColor}
                 transparent
-                opacity={isSelected ? 0.6 : 0.35}
+                opacity={isSelected ? 0.5 : 0.25}
                 side={THREE.DoubleSide}
               />
             </mesh>
 
-            {/* 2. Vertical Hazard Warning Beacon Pillar */}
-            <mesh position={[0, 4.0, 0]}>
-              <cylinderGeometry args={[0.08, 0.4, 8, 8]} />
-              <meshStandardMaterial
-                color={ringColor}
-                emissive={ringColor}
-                emissiveIntensity={0.8}
-                transparent
-                opacity={0.65}
-              />
+            {/* Subtle central pin */}
+            <mesh position={[0, 1.2, 0]}>
+              <cylinderGeometry args={[0.04, 0.12, 2.4, 6]} />
+              <meshBasicMaterial color={ringColor} />
+            </mesh>
+            <mesh position={[0, 2.4, 0]}>
+              <sphereGeometry args={[0.25, 8, 8]} />
+              <meshBasicMaterial color={ringColor} />
             </mesh>
 
-            {/* Hazard Point Light */}
-            <pointLight position={[0, 8.0, 0]} color={ringColor} intensity={3} distance={20} />
-
-            {/* 3. Disruption Floating Badge HUD */}
+            {/* 2. Compact White GIS Disruption Badge */}
             <Html
-              position={[0, 8.8, 0]}
+              position={[0, 3.2, 0]}
               center
               distanceFactor={80}
               zIndexRange={[15, 0]}
               style={{ pointerEvents: "none" }}
             >
               <div
-                className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold shadow-2xl backdrop-blur-md transition-all select-none whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none whitespace-nowrap cursor-pointer ${
                   isSelected
-                    ? "bg-rose-950 border-2 border-white text-white ring-2 ring-rose-400 scale-110"
-                    : "bg-slate-900/95 border border-rose-500/80 text-rose-200"
+                    ? "bg-slate-900 border-2 border-rose-500 text-white shadow-md scale-105"
+                    : "bg-white/95 border border-rose-400 text-rose-700 hover:border-rose-600"
                 }`}
               >
-                <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
                 <span>{d.incident_code}</span>
-                <span className="text-[9px] text-slate-300 font-sans font-normal">
+                <span className="text-[8px] text-slate-500 font-sans font-normal">
                   · {d.incident_type}
                 </span>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, forwardRef, useImperativeHandle } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -101,12 +101,11 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
   ) {
     const controlsRef = useRef<OrbitControlsImpl>(null);
 
-    // Expose camera controls to outer HUD
     useImperativeHandle(ref, () => ({
       resetCamera: () => {
         if (controlsRef.current) {
-          controlsRef.current.target.set(0, 2, 0);
-          controlsRef.current.object.position.set(0, 75, 115);
+          controlsRef.current.target.set(2, 0, 5);
+          controlsRef.current.object.position.set(0, 85, 80);
           controlsRef.current.update();
         }
       },
@@ -128,77 +127,64 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
         if (controlsRef.current) {
           const cam = controlsRef.current.object;
           if (is25D) {
-            // Isometric 2.5D angle
-            cam.position.set(0, 75, 115);
+            cam.position.set(0, 85, 80);
           } else {
-            // Top-down overhead tactical map
-            cam.position.set(0, 140, 5);
+            cam.position.set(2, 140, 6);
           }
-          controlsRef.current.target.set(0, 2, 0);
+          controlsRef.current.target.set(2, 0, 5);
           controlsRef.current.update();
         }
       },
       flyTo: ([x, y, z]: [number, number, number]) => {
         if (controlsRef.current) {
           controlsRef.current.target.set(x, y, z);
-          controlsRef.current.object.position.set(x, y + 45, z + 65);
+          controlsRef.current.object.position.set(x, y + 38, z + 48);
           controlsRef.current.update();
         }
       },
     }));
 
     return (
-      <div className="w-full h-full relative bg-[#040911]">
+      <div className="w-full h-full relative bg-[#dbeafe]">
         <Canvas
           shadows
           camera={{
-            position: [0, 75, 115],
-            fov: 42,
+            position: [0, 85, 80],
+            fov: 38,
             near: 1,
-            far: 1200,
+            far: 1400,
           }}
           onPointerMissed={() => onPointerMissed?.()}
           gl={{
             antialias: true,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.15,
+            toneMappingExposure: 1.05,
           }}
         >
-          {/* Atmospheric Environmental Lighting */}
-          <ambientLight color="#1a2b42" intensity={1.1} />
+          {/* Bright Daytime Environmental GIS Lighting */}
+          <ambientLight color="#f8fafc" intensity={1.35} />
           
           <hemisphereLight
-            color="#38bdf8"
-            groundColor="#061220"
-            intensity={0.85}
+            color="#bae6fd"
+            groundColor="#e2e8f0"
+            intensity={0.9}
           />
 
-          {/* Elevated Sun/Moon Key Light */}
+          {/* Elevated Sun Key Light */}
           <directionalLight
-            position={[100, 140, 90]}
-            intensity={2.2}
-            color="#f1f5f9"
+            position={[80, 130, 70]}
+            intensity={2.3}
+            color="#ffffff"
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
             shadow-camera-near={10}
-            shadow-camera-far={400}
-            shadow-camera-left={-120}
-            shadow-camera-right={120}
-            shadow-camera-top={120}
-            shadow-camera-bottom={-120}
-            shadow-bias={-0.0005}
-          />
-
-          {/* Quayside High-Mast Operations Floodlight */}
-          <spotLight
-            position={[0, 45, -5]}
-            target-position={[0, 2, 10]}
-            color="#e0f2fe"
-            intensity={3.0}
-            angle={0.7}
-            penumbra={0.6}
-            distance={160}
+            shadow-camera-far={350}
+            shadow-camera-left={-110}
+            shadow-camera-right={110}
+            shadow-camera-top={110}
+            shadow-camera-bottom={-110}
+            shadow-bias={-0.0003}
           />
 
           {/* 3D Scene Components */}
@@ -255,19 +241,19 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
             visible={layers.proposedPlan}
           />
 
-          {/* Interactive Orbit Controls */}
+          {/* Clean Interactive Orbit Controls */}
           <OrbitControls
             ref={controlsRef}
-            target={[0, 2, 0]}
+            target={[2, 0, 5]}
             enableDamping
             dampingFactor={0.08}
-            maxPolarAngle={Math.PI / 2.08}
-            minPolarAngle={0.1}
-            minDistance={12}
-            maxDistance={350}
-            panSpeed={1.0}
-            rotateSpeed={0.8}
-            zoomSpeed={1.1}
+            maxPolarAngle={Math.PI / 2.15}
+            minPolarAngle={0.08}
+            minDistance={10}
+            maxDistance={320}
+            panSpeed={0.9}
+            rotateSpeed={0.7}
+            zoomSpeed={1.0}
           />
         </Canvas>
       </div>

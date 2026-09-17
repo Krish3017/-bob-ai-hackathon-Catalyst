@@ -26,7 +26,7 @@ export function NavigationRoutes({
   selectedAnchorageId,
   onSelectAnchorage,
 }: NavigationRoutesProps) {
-  // Extract navigational buoys from FAIRWAY_NAV_GEOJSON
+  // Extract navigational buoys
   const buoys = useMemo(() => {
     return FAIRWAY_NAV_GEOJSON.features
       .filter((f) => f.geometry.type === "Point")
@@ -36,7 +36,7 @@ export function NavigationRoutes({
           id: f.properties?.buoy_id || "NB",
           name: f.properties?.name || "Navigational Buoy",
           color: f.properties?.color || "#10b981",
-          position: geoToWorld(coords, 0.4),
+          position: geoToWorld(coords, 0.2),
         };
       });
   }, []);
@@ -45,13 +45,13 @@ export function NavigationRoutes({
   const routeGeometries = useMemo(() => {
     return PORT_ROUTES.map((route) => {
       const points = route.waypoints.map((wp) => {
-        const [x, , z] = geoToWorld(wp, 0.25);
-        return new THREE.Vector3(x, 0.25, z);
+        const [x, , z] = geoToWorld(wp, 0.12);
+        return new THREE.Vector3(x, 0.12, z);
       });
       const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.15);
       return {
         id: route.id,
-        color: route.color,
+        color: route.color === "#38bdf8" ? "#2563eb" : route.color,
         name: route.name,
         curve,
       };
@@ -65,32 +65,27 @@ export function NavigationRoutes({
         <group>
           {buoys.map((buoy) => (
             <group key={buoy.id} position={buoy.position}>
-              {/* Buoy Flotation Drum */}
-              <mesh castShadow>
-                <cylinderGeometry args={[0.5, 0.6, 0.8, 8]} />
-                <meshStandardMaterial color={buoy.color} metalness={0.4} roughness={0.5} />
+              <mesh>
+                <cylinderGeometry args={[0.35, 0.45, 0.55, 8]} />
+                <meshStandardMaterial color={buoy.color} roughness={0.4} />
               </mesh>
-              {/* Buoy Top Tower Mast */}
+              <mesh position={[0, 0.5, 0]}>
+                <cylinderGeometry args={[0.04, 0.05, 0.5, 6]} />
+                <meshStandardMaterial color="#475569" />
+              </mesh>
               <mesh position={[0, 0.8, 0]}>
-                <cylinderGeometry args={[0.06, 0.08, 0.9, 6]} />
-                <meshStandardMaterial color="#334155" />
-              </mesh>
-              {/* Flashing Nav Light */}
-              <mesh position={[0, 1.3, 0]}>
-                <sphereGeometry args={[0.16, 8, 8]} />
+                <sphereGeometry args={[0.12, 8, 8]} />
                 <meshBasicMaterial color={buoy.color} />
               </mesh>
-              <pointLight position={[0, 1.4, 0]} color={buoy.color} intensity={2} distance={15} />
 
-              {/* Buoy Tag */}
               <Html
-                position={[0, 2.2, 0]}
+                position={[0, 1.4, 0]}
                 center
-                distanceFactor={70}
+                distanceFactor={75}
                 zIndexRange={[10, 0]}
                 style={{ pointerEvents: "none" }}
               >
-                <div className="rounded bg-slate-900/90 px-1 py-0.5 text-[8px] font-mono font-bold text-slate-300 border border-slate-700/60 shadow">
+                <div className="rounded bg-white/95 px-1 py-0.2 text-[8px] font-mono font-bold text-slate-700 border border-slate-300 shadow-sm">
                   {buoy.id}
                 </div>
               </Html>
@@ -99,19 +94,17 @@ export function NavigationRoutes({
         </group>
       )}
 
-      {/* 2. Navigation Routes Spline Ribbons */}
+      {/* 2. Navigation Routes Spline Lines */}
       {routesVisible && (
         <group>
           {routeGeometries.map((r) => (
             <mesh key={r.id}>
-              <tubeGeometry args={[r.curve, 64, 0.18, 6, false]} />
+              <tubeGeometry args={[r.curve, 64, 0.12, 6, false]} />
               <meshStandardMaterial
                 color={r.color}
-                emissive={r.color}
-                emissiveIntensity={0.6}
+                roughness={0.3}
                 transparent
-                opacity={0.75}
-                roughness={0.2}
+                opacity={0.85}
               />
             </mesh>
           ))}
@@ -123,7 +116,7 @@ export function NavigationRoutes({
         <group>
           {PORT_ANCHORAGES.map((anc) => {
             const isSelected = selectedAnchorageId === anc.id;
-            const [cx, , cz] = geoToWorld(anc.coordinates, 0.05);
+            const [cx, , cz] = geoToWorld(anc.coordinates, 0.02);
 
             const shape = new THREE.Shape();
             anc.polygon.forEach((pt, idx) => {
@@ -140,25 +133,25 @@ export function NavigationRoutes({
                   onSelectAnchorage?.(anc);
                 }}
               >
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
                   <shapeGeometry args={[shape]} />
                   <meshStandardMaterial
-                    color="#14b8a6"
+                    color="#0d9488"
                     transparent
-                    opacity={isSelected ? 0.35 : 0.15}
-                    roughness={0.5}
+                    opacity={isSelected ? 0.3 : 0.12}
+                    roughness={0.6}
                   />
                 </mesh>
 
                 <Html
-                  position={[cx, 1.5, cz]}
+                  position={[cx, 0.8, cz]}
                   center
                   distanceFactor={85}
                   zIndexRange={[10, 0]}
                   style={{ pointerEvents: "none" }}
                 >
-                  <div className="flex items-center gap-1 rounded bg-slate-900/85 px-1.5 py-0.5 text-[9px] font-mono text-teal-300 border border-teal-500/40 shadow backdrop-blur-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                  <div className="flex items-center gap-1 rounded bg-white/95 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-teal-800 border border-teal-300 shadow-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
                     <span>{anc.zone_name}</span>
                   </div>
                 </Html>

@@ -95,33 +95,33 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
   };
 
   return (
-    <div className="absolute top-28 right-6 z-30 w-88 max-w-[calc(100vw-3rem)] rounded-xl border border-slate-700/80 bg-slate-900/95 p-4 text-slate-200 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-200">
+    <div className="absolute top-20 right-4 z-30 w-88 max-w-[calc(100vw-3rem)] rounded-xl border border-slate-200 bg-white/98 p-4 text-slate-800 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-200">
       {/* Header */}
-      <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+      <div className="flex items-start justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/90 text-cyan-400 border border-slate-700 shadow-inner">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-blue-600 border border-slate-200 shadow-inner">
             {selection.type === "berth" && <Anchor className="h-4 w-4" />}
             {selection.type === "vessel" && <Ship className="h-4 w-4" />}
             {selection.type === "crane" && <Cpu className="h-4 w-4" />}
             {selection.type === "yard" && <Boxes className="h-4 w-4" />}
             {selection.type === "anchorage" && <Compass className="h-4 w-4" />}
-            {selection.type === "disruption" && <AlertTriangle className="h-4 w-4 text-rose-400" />}
-            {selection.type === "recommendation" && <Sparkles className="h-4 w-4 text-cyan-400" />}
+            {selection.type === "disruption" && <AlertTriangle className="h-4 w-4 text-rose-500" />}
+            {selection.type === "recommendation" && <Sparkles className="h-4 w-4 text-blue-600" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono tracking-wider text-slate-400 uppercase">
+              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase">
                 {selection.type}
               </span>
               <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusColor(
+                className={`inline-flex items-center rounded-full px-2 py-0.2 text-[9px] font-semibold border ${getStatusColor(
                   (selection.data as any).severity || (selection.data as any).status || "Active"
                 )}`}
               >
                 {(selection.data as any).severity || (selection.data as any).status || "Active"}
               </span>
             </div>
-            <h3 className="text-sm font-bold text-white tracking-tight">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
               {selection.type === "berth" && `${selection.data.berth_code} — ${selection.data.berth_name}`}
               {selection.type === "vessel" && `${selection.data.vessel_code} · ${selection.data.vessel_name}`}
               {selection.type === "crane" && `${selection.data.crane_code} — ${selection.data.crane_name}`}
@@ -134,7 +134,7 @@ export function PortTwinPopup({ selection, onClose, onSelectObject }: PortTwinPo
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
           aria-label="Close panel"
         >
           <X className="h-4 w-4" />

@@ -19,19 +19,18 @@ export function ProposedPlanOverlays({
   onSelectRecommendation,
   visible = true,
 }: ProposedPlanOverlaysProps) {
-  // Generate 3D parabolic parabolic flight arc curves
   const arcs = useMemo(() => {
     return recommendations.map((rec) => {
       const [startLng, startLat] = rec.trajectory[0];
       const [endLng, endLat] = rec.trajectory[rec.trajectory.length - 1];
 
-      const start = geoToWorld([startLng, startLat], 1.2);
-      const end = geoToWorld([endLng, endLat], 2.8);
+      const start = geoToWorld([startLng, startLat], 0.3);
+      const end = geoToWorld([endLng, endLat], 0.5);
 
       const midX = (start[0] + end[0]) / 2;
       const midZ = (start[2] + end[2]) / 2;
       const dist = Math.hypot(end[0] - start[0], end[2] - start[2]);
-      const arcHeight = Math.max(8, dist * 0.22);
+      const arcHeight = Math.max(3.5, dist * 0.12);
       const mid = [midX, arcHeight, midZ];
 
       const curve = new THREE.QuadraticBezierCurve3(
@@ -63,29 +62,27 @@ export function ProposedPlanOverlays({
               onSelectRecommendation(rec);
             }}
           >
-            {/* 1. Luminous 3D Assignment Vector Arc Tube */}
+            {/* 1. Thin Luminous Assignment Curve */}
             <mesh>
-              <tubeGeometry args={[curve, 48, isSelected ? 0.35 : 0.22, 8, false]} />
+              <tubeGeometry args={[curve, 48, isSelected ? 0.18 : 0.1, 8, false]} />
               <meshStandardMaterial
-                color={isSelected ? "#00f2fe" : "#38bdf8"}
-                emissive="#0284c7"
-                emissiveIntensity={0.8}
+                color={isSelected ? "#0284c7" : "#0ea5e9"}
+                roughness={0.3}
                 transparent
                 opacity={0.85}
-                roughness={0.2}
               />
             </mesh>
 
-            {/* 2. Destination Anchor Mooring Arrow Ring */}
+            {/* Destination Target Ring on Berth */}
             <mesh
-              position={geoToWorld(rec.trajectory[rec.trajectory.length - 1], 2.8)}
+              position={geoToWorld(rec.trajectory[rec.trajectory.length - 1], 0.52)}
               rotation={[-Math.PI / 2, 0, 0]}
             >
-              <ringGeometry args={[1.2, 2.0, 16]} />
-              <meshBasicMaterial color="#00f2fe" transparent opacity={0.7} side={THREE.DoubleSide} />
+              <ringGeometry args={[0.8, 1.3, 16]} />
+              <meshBasicMaterial color="#0284c7" transparent opacity={0.6} side={THREE.DoubleSide} />
             </mesh>
 
-            {/* 3. Floating Optimization Benefit Pill Badge */}
+            {/* 2. Compact White GIS Assignment Pill */}
             <Html
               position={midpoint}
               center
@@ -94,16 +91,16 @@ export function ProposedPlanOverlays({
               style={{ pointerEvents: "none" }}
             >
               <div
-                className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold shadow-2xl backdrop-blur-md transition-all select-none whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[9px] font-mono font-bold shadow-sm transition-all select-none whitespace-nowrap cursor-pointer ${
                   isSelected
-                    ? "bg-cyan-950 border-2 border-white text-white ring-2 ring-cyan-400 scale-110"
-                    : "bg-slate-900/95 border border-cyan-500/80 text-cyan-200 hover:border-cyan-400"
+                    ? "bg-slate-900 border-2 border-blue-500 text-white shadow-md scale-105"
+                    : "bg-white/95 border border-sky-400 text-sky-900 hover:border-sky-600"
                 }`}
               >
-                <span className="text-cyan-400">⚡ {rec.vessel_name}</span>
+                <span className="text-blue-600">⚡ {rec.vessel_name}</span>
                 <span className="text-slate-400">→</span>
-                <span className="text-emerald-300 font-bold">{rec.proposed_berth_code}</span>
-                <span className="text-[9px] text-emerald-400 bg-emerald-950/80 px-1 rounded border border-emerald-500/30">
+                <span className="text-emerald-700 font-bold">{rec.proposed_berth_code}</span>
+                <span className="text-[8px] text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-300">
                   +${(rec.demurrage_savings_usd / 1000).toFixed(1)}k
                 </span>
               </div>

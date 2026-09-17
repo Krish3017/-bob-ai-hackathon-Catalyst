@@ -2,67 +2,67 @@
 
 import React, { useRef } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
 
 export function Ocean() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const gridRef = useRef<THREE.GridHelper>(null);
-
-  // Subtle wave shimmer using time in useFrame
-  useFrame(({ clock }) => {
-    if (meshRef.current && meshRef.current.material) {
-      const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-      const t = clock.getElapsedTime();
-      mat.roughness = 0.35 + Math.sin(t * 0.4) * 0.05;
-    }
-  });
 
   return (
-    <group position={[0, -0.05, 0]}>
-      {/* Primary Deep Navy Water Surface */}
+    <group position={[0, -0.02, 0]}>
+      {/* 1. Primary Pale Blue Nautical Water Surface */}
       <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[700, 700, 32, 32]} />
+        <planeGeometry args={[800, 800]} />
         <meshStandardMaterial
-          color="#071322"
-          emissive="#040b14"
-          emissiveIntensity={0.2}
-          roughness={0.35}
-          metalness={0.65}
+          color="#dbeafe"
+          roughness={0.6}
+          metalness={0.1}
         />
       </mesh>
 
-      {/* Shallow Coastal Contour Shelf Under Port Quay */}
+      {/* 2. Coastal Harbor Shelf Basin Under Quay (Subtle soft tone) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 10]} receiveShadow>
-        <planeGeometry args={[220, 120]} />
+        <planeGeometry args={[240, 130]} />
         <meshStandardMaterial
-          color="#0a1d33"
-          roughness={0.5}
-          metalness={0.4}
+          color="#d0e3f7"
+          roughness={0.7}
+          metalness={0.05}
           transparent
-          opacity={0.7}
+          opacity={0.8}
         />
       </mesh>
 
-      {/* Fairway Navigational Deep Dredged Channel (Draft 17.5m) */}
+      {/* 3. Fairway Deep Dredged Navigational Channel (Draft 17.5m corridor) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0.38]}
         position={[45, 0.02, 35]}
         receiveShadow
       >
-        <planeGeometry args={[180, 48]} />
+        <planeGeometry args={[200, 52]} />
         <meshStandardMaterial
-          color="#050e1a"
-          roughness={0.3}
-          metalness={0.7}
-          transparent
-          opacity={0.6}
+          color="#c2ddf8"
+          roughness={0.5}
+          metalness={0.1}
         />
       </mesh>
 
-      {/* Nautical Tactical Grid Coordinate Reference */}
+      {/* Fairway Channel Border Guidelines (Dashed channel limits) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0.38]}
+        position={[25, 0.03, 50]}
+      >
+        <planeGeometry args={[190, 0.4]} />
+        <meshBasicMaterial color="#93c5fd" />
+      </mesh>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0.38]}
+        position={[65, 0.03, 20]}
+      >
+        <planeGeometry args={[190, 0.4]} />
+        <meshBasicMaterial color="#93c5fd" />
+      </mesh>
+
+      {/* 4. Subtle Nautical Chart Grid Reference */}
       <gridHelper
-        ref={gridRef}
-        args={[600, 60, "#122a46", "#0b1c30"]}
+        args={[600, 50, "#bfdbfe", "#cbd5e1"]}
         position={[0, 0.03, 0]}
       />
     </group>

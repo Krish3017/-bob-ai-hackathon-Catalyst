@@ -27,7 +27,6 @@ import { PortTwinIntelligence, IntelligenceTab } from "../port-twin/port-twin-in
 import { geoToWorld } from "./coords";
 import { api } from "@/lib/api";
 
-// Interpolate vessel movement along route waypoints
 function interpolateRoutePosition(
   waypoints: [number, number][],
   progress: number
@@ -118,7 +117,6 @@ export function PortTwin3DMap() {
     proposedPlan: true,
   });
 
-  // Active transit count for HUD
   const activeTransitCount = vessels.filter((v) => v.status === "Approaching").length;
 
   // Stats Telemetry
@@ -135,7 +133,6 @@ export function PortTwin3DMap() {
     ),
   };
 
-  // Simulation Clock Formatter
   const formatSimClock = (totalSec: number) => {
     const hrs = Math.floor(totalSec / 3600) % 24;
     const mins = Math.floor((totalSec % 3600) / 60);
@@ -143,7 +140,7 @@ export function PortTwin3DMap() {
     return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")} UTC`;
   };
 
-  // Vessel Simulation Ticker Loop
+  // Simulation Ticker Loop
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -177,38 +174,38 @@ export function PortTwin3DMap() {
   // Object Selection Handlers
   const handleSelectBerth = useCallback((b: PortTwinBerth) => {
     setSelectedObject({ type: "berth", data: b });
-    const worldPos = geoToWorld(b.coordinates, 2.5);
+    const worldPos = geoToWorld(b.coordinates, 0.4);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
   const handleSelectCrane = useCallback((c: PortTwinCrane) => {
     setSelectedObject({ type: "crane", data: c });
-    const worldPos = geoToWorld(c.coordinates, 2.5);
+    const worldPos = geoToWorld(c.coordinates, 0.4);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
   const handleSelectYard = useCallback((y: PortTwinYard) => {
     setSelectedObject({ type: "yard", data: y });
-    const worldPos = geoToWorld(y.coordinates, 2.5);
+    const worldPos = geoToWorld(y.coordinates, 0.4);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
   const handleSelectVessel = useCallback((v: PortTwinVessel) => {
     setSelectedObject({ type: "vessel", data: v });
-    const worldPos = geoToWorld(v.coordinates, 1.0);
+    const worldPos = geoToWorld(v.coordinates, 0.1);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
   const handleSelectAnchorage = useCallback((anc: PortTwinAnchorage) => {
     setSelectedObject({ type: "anchorage", data: anc });
-    const worldPos = geoToWorld(anc.coordinates, 0.5);
+    const worldPos = geoToWorld(anc.coordinates, 0.05);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
   const handleSelectDisruption = useCallback((d: PortTwinDisruption) => {
     setSelectedDisruption(d);
     setSelectedObject({ type: "disruption", data: d });
-    const worldPos = geoToWorld(d.coordinates, 2.5);
+    const worldPos = geoToWorld(d.coordinates, 0.4);
     sceneControlsRef.current?.flyTo(worldPos);
   }, []);
 
@@ -218,14 +215,14 @@ export function PortTwin3DMap() {
       setSelectedObject({ type: "recommendation", data: rec });
       const berth = berths.find((b) => b.berth_code === rec.proposed_berth_code);
       if (berth) {
-        const worldPos = geoToWorld(berth.coordinates, 2.5);
+        const worldPos = geoToWorld(berth.coordinates, 0.4);
         sceneControlsRef.current?.flyTo(worldPos);
       }
     },
     [berths]
   );
 
-  // What-If Scenario Activation
+  // Scenario Activation Handlers
   const handleActivateScenario = useCallback(
     async (preset: PortTwinScenarioPreset) => {
       setActiveScenario(preset);
@@ -258,7 +255,7 @@ export function PortTwin3DMap() {
         setIsSimulating(false);
       }
 
-      // Apply failure states to cranes
+      // Apply crane failure state
       if (preset.unavailable_crane_codes.length > 0) {
         setCranes((prev) =>
           prev.map((c) =>
@@ -269,12 +266,12 @@ export function PortTwin3DMap() {
         );
         const targetCrane = cranes.find((c) => preset.unavailable_crane_codes.includes(c.crane_code));
         if (targetCrane) {
-          const worldPos = geoToWorld(targetCrane.coordinates, 2.5);
+          const worldPos = geoToWorld(targetCrane.coordinates, 0.4);
           sceneControlsRef.current?.flyTo(worldPos);
         }
       }
 
-      // Apply maintenance states to berths
+      // Apply berth maintenance state
       if (preset.unavailable_berth_codes.length > 0) {
         setBerths((prev) =>
           prev.map((b) =>
@@ -312,53 +309,72 @@ export function PortTwin3DMap() {
   };
 
   return (
-    <div className="relative w-full h-full min-h-[640px] bg-[#040911] overflow-hidden select-none rounded-2xl border border-slate-800 shadow-2xl">
-      {/* Three.js R3F Canvas Scene */}
-      <PortScene
-        ref={sceneControlsRef}
-        berths={berths}
-        cranes={cranes}
-        yards={yards}
-        vessels={vessels}
-        disruptions={disruptions}
-        recommendations={recommendations}
-        layers={layers}
-        selectedBerthId={selectedObject?.type === "berth" ? selectedObject.data.id : null}
-        selectedCraneId={selectedObject?.type === "crane" ? selectedObject.data.id : null}
-        selectedYardId={selectedObject?.type === "yard" ? selectedObject.data.id : null}
-        selectedVesselId={selectedObject?.type === "vessel" ? selectedObject.data.id : null}
-        selectedDisruptionId={selectedDisruption?.id || null}
-        selectedRecommendationId={selectedRecommendation?.id || null}
-        onSelectBerth={handleSelectBerth}
-        onSelectCrane={handleSelectCrane}
-        onSelectYard={handleSelectYard}
-        onSelectVessel={handleSelectVessel}
-        onSelectAnchorage={handleSelectAnchorage}
-        onSelectDisruption={handleSelectDisruption}
-        onSelectRecommendation={handleSelectRecommendation}
-        onPointerMissed={() => setSelectedObject(null)}
-      />
+    <div className="flex flex-col gap-4 w-full">
+      {/* 1. CLEAN PORT DIGITAL TWIN MAP VIEWPORT */}
+      <div className="relative w-full h-[640px] bg-[#dbeafe] overflow-hidden select-none rounded-2xl border border-slate-200 shadow-sm">
+        {/* Three.js R3F Light GIS Scene */}
+        <PortScene
+          ref={sceneControlsRef}
+          berths={berths}
+          cranes={cranes}
+          yards={yards}
+          vessels={vessels}
+          disruptions={disruptions}
+          recommendations={recommendations}
+          layers={layers}
+          selectedBerthId={selectedObject?.type === "berth" ? selectedObject.data.id : null}
+          selectedCraneId={selectedObject?.type === "crane" ? selectedObject.data.id : null}
+          selectedYardId={selectedObject?.type === "yard" ? selectedObject.data.id : null}
+          selectedVesselId={selectedObject?.type === "vessel" ? selectedObject.data.id : null}
+          selectedDisruptionId={selectedDisruption?.id || null}
+          selectedRecommendationId={selectedRecommendation?.id || null}
+          onSelectBerth={handleSelectBerth}
+          onSelectCrane={handleSelectCrane}
+          onSelectYard={handleSelectYard}
+          onSelectVessel={handleSelectVessel}
+          onSelectAnchorage={handleSelectAnchorage}
+          onSelectDisruption={handleSelectDisruption}
+          onSelectRecommendation={handleSelectRecommendation}
+          onPointerMissed={() => setSelectedObject(null)}
+        />
 
-      {/* OVERLAY HUD & SIMULATION CONTROLS (Preserved from Phase 1 & 2) */}
-      <PortTwinOverlay
-        layers={layers as any}
-        onToggleLayer={handleToggleLayer as any}
-        onZoomIn={() => sceneControlsRef.current?.zoomIn()}
-        onZoomOut={() => sceneControlsRef.current?.zoomOut()}
-        onResetView={() => sceneControlsRef.current?.resetCamera()}
-        onTogglePitch={handleTogglePitch}
-        is25DPitch={is25DPitch}
-        isPlaying={isPlaying}
-        onTogglePlay={() => setIsPlaying(!isPlaying)}
-        simSpeed={simSpeed}
-        onChangeSpeed={(s) => setSimSpeed(s)}
-        onResetSimulation={handleResetSimulation}
-        simClock={formatSimClock(simSeconds)}
-        activeTransitCount={activeTransitCount}
-        stats={stats}
-      />
+        {/* COMPACT MAP OVERLAY HUD (Clean Light GIS Controls) */}
+        <PortTwinOverlay
+          layers={layers as any}
+          onToggleLayer={handleToggleLayer as any}
+          onZoomIn={() => sceneControlsRef.current?.zoomIn()}
+          onZoomOut={() => sceneControlsRef.current?.zoomOut()}
+          onResetView={() => sceneControlsRef.current?.resetCamera()}
+          onTogglePitch={handleTogglePitch}
+          is25DPitch={is25DPitch}
+          isPlaying={isPlaying}
+          onTogglePlay={() => setIsPlaying(!isPlaying)}
+          simSpeed={simSpeed}
+          onChangeSpeed={(s) => setSimSpeed(s)}
+          onResetSimulation={handleResetSimulation}
+          simClock={formatSimClock(simSeconds)}
+          activeTransitCount={activeTransitCount}
+          stats={stats}
+        />
 
-      {/* PHASE 3: OPERATIONAL INTELLIGENCE & SCENARIO STUDIO */}
+        {/* OBJECT INSPECTION DETAIL POPUP */}
+        <PortTwinPopup
+          selection={selectedObject}
+          onClose={() => setSelectedObject(null)}
+          onSelectObject={(obj) => setSelectedObject(obj)}
+        />
+
+        {/* Subtle Map Corner Datum Coordinate Tag */}
+        <div className="absolute top-3 right-4 pointer-events-none hidden lg:flex items-center gap-2 rounded-md bg-white/95 border border-slate-200 px-2.5 py-1 text-[10px] font-mono text-slate-600 shadow-sm z-10 backdrop-blur-sm">
+          <span className="text-blue-600 font-bold">GIS 2.5D</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-700">LAT 01°15.3'N</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-700">LON 103°45.2'E</span>
+        </div>
+      </div>
+
+      {/* 2. OPERATIONAL INTELLIGENCE & SCENARIO STUDIO (MOVED OUTSIDE & BELOW THE MAP) */}
       <PortTwinIntelligence
         activeTab={intelligenceTab}
         onChangeTab={(t) => setIntelligenceTab(t)}
@@ -381,22 +397,6 @@ export function PortTwin3DMap() {
         isSimulating={isSimulating}
         simulationDeltas={simulationDeltas}
       />
-
-      {/* OBJECT INSPECTION DETAIL POPUP */}
-      <PortTwinPopup
-        selection={selectedObject}
-        onClose={() => setSelectedObject(null)}
-        onSelectObject={(obj) => setSelectedObject(obj)}
-      />
-
-      {/* SUBTLE CORNER COMPASS / COORDINATE TELEMETRY */}
-      <div className="absolute top-4 right-4 pointer-events-none hidden lg:flex items-center gap-2 rounded-lg bg-slate-900/75 border border-slate-800 px-2.5 py-1 text-[10px] font-mono text-slate-400 backdrop-blur-md z-10 shadow-lg">
-        <span className="text-cyan-400">3D ENGINE</span> Three.js / R3F
-        <span className="text-slate-600">|</span>
-        <span className="text-cyan-400">LAT</span> 01°15.3'N
-        <span className="text-slate-600">|</span>
-        <span className="text-cyan-400">LON</span> 103°45.2'E
-      </div>
     </div>
   );
 }
