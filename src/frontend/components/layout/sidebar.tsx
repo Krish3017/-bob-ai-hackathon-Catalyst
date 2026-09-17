@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   UserCheck,
   Eye,
+  Radio,
 } from "lucide-react";
 import { User, UserRole } from "@/types";
 
@@ -62,6 +63,13 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
       href: "/operations",
       icon: Compass,
       roles: ["admin", "operations"],
+    },
+    {
+      name: "Port Twin",
+      href: "/port-twin",
+      icon: Radio,
+      roles: ["admin", "operations", "viewer"],
+      badge: "2.5D",
     },
     {
       name: "Assets",

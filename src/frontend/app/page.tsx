@@ -22,6 +22,7 @@ import {
   AlertCircle,
   DollarSign,
   Leaf,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -242,6 +243,16 @@ export default function DashboardPage() {
                 <ChevronDown className="h-3.5 w-3.5" />
               )}
             </button>
+
+            <Link href="/port-twin">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-500/20 transition-colors shadow-sm"
+              >
+                <Radio className="h-3.5 w-3.5 text-cyan-700" />
+                <span>Port Twin</span>
+              </button>
+            </Link>
 
             <Link href="/optimization">
               <button
