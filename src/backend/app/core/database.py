@@ -49,7 +49,7 @@ def clean_row(row: Dict[str, Any]) -> Dict[str, Any]:
 import sqlite3
 
 USER_SQLITE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
-USER_SQLITE_PATH = os.path.join(USER_SQLITE_DIR, "naviops_users.db")
+USER_SQLITE_PATH = os.environ.get("USER_SQLITE_PATH", os.path.join(USER_SQLITE_DIR, "naviops_users.db"))
 
 
 def _init_user_sqlite():
@@ -227,6 +227,17 @@ class PortRepository:
 
         # 3. Sync from live Supabase PostgreSQL
         self.connect_and_sync()
+
+    def refresh_users_from_db(self):
+        """Ensure in-memory users cache is completely synchronized with persistent store."""
+        sqlite_users = _load_users_sqlite()
+        if sqlite_users:
+            current_ids = {u["id"] for u in sqlite_users}
+            for u in sqlite_users:
+                super(SyncedTable, self.users).__setitem__(u["id"], u)
+            for uid in list(self.users.keys()):
+                if uid not in current_ids:
+                    super(SyncedTable, self.users).__delitem__(uid)
 
     def get_connection(self):
         """Get or reuse a persistent connection to PostgreSQL with dict_row factory."""

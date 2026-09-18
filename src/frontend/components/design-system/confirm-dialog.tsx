@@ -11,11 +11,12 @@ import React, {
 import { AlertTriangle, HelpCircle, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ConfirmVariant = "destructive" | "warning" | "default";
+export type ConfirmVariant = "destructive" | "danger" | "warning" | "default";
 
 export interface ConfirmOptions {
   title: string;
-  description: string;
+  description?: string;
+  message?: string;
   confirmText?: string;
   cancelText?: string;
   variant?: ConfirmVariant;
@@ -119,34 +120,20 @@ function ConfirmDialogModal({
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const variant = options.variant || "default";
+  const rawVariant = options.variant || "default";
+  const normalizedVariant =
+    rawVariant === "danger" || rawVariant === "destructive"
+      ? "destructive"
+      : rawVariant === "warning"
+      ? "warning"
+      : "default";
 
-  // Auto focus confirm button and handle Escape / Tab trap
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      confirmBtnRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onCancel]);
-
-  const config = {
+  const configMap = {
     destructive: {
       iconBox: "bg-[#FEE4E2]/80 text-[#D92D20] border border-[#FECDCA]",
       icon: <AlertTriangle className="h-5 w-5" />,
       confirmBtn:
-        "bg-[#FEE4E2] text-[#D92D20] border border-[#FECDCA] hover:bg-[#FECDCA] active:bg-[#F8A9A4]",
+        "bg-[#D92D20] text-white border border-[#D92D20] hover:bg-[#B42318] active:bg-[#912018]",
       defaultConfirmText: "Delete",
     },
     warning: {
@@ -163,7 +150,9 @@ function ConfirmDialogModal({
         "bg-[#004741] text-white border border-[#004741] hover:bg-[#003B36] active:bg-[#002D29]",
       defaultConfirmText: "Confirm",
     },
-  }[variant];
+  };
+
+  const config = configMap[normalizedVariant] || configMap.default;
 
   return (
     <div
@@ -209,7 +198,7 @@ function ConfirmDialogModal({
               id="confirm-dialog-description"
               className="mt-1.5 text-xs text-[#5C6B68] leading-relaxed font-normal"
             >
-              {options.description}
+              {options.description || options.message}
             </p>
           </div>
         </div>

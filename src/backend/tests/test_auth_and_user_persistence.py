@@ -159,3 +159,42 @@ def test_admin_updates_user_role():
     sqlite_matched = [u for u in sqlite_users if u["id"] == user_id]
     assert len(sqlite_matched) == 1
     assert sqlite_matched[0]["role"] == "operations"
+
+
+def test_delete_user_flow_and_safeguards():
+    """Verify admin can delete a user, non-admins are blocked, and safeguards prevent self-deletion."""
+    unique_id = uuid.uuid4().hex[:8]
+    target_email = f"delete.target.{unique_id}@naviops.port"
+
+    # 1. Admin creates temporary user
+    create_res = client.post("/api/auth/users", headers=admin_headers(), json={
+        "full_name": "Temporary Staff",
+        "email": target_email,
+        "password": "password123",
+        "role": "operations"
+    })
+    assert create_res.status_code == 201
+    user_id = create_res.json()["id"]
+
+    # 2. Non-admin cannot delete user (403)
+    ops_token = create_access_token({"sub": "22222222-2222-2222-2222-222222222222", "email": "ops@naviops.port", "role": "operations"})
+    ops_del = client.delete(f"/api/auth/users/{user_id}", headers={"Authorization": f"Bearer {ops_token}"})
+    assert ops_del.status_code == 403
+
+    # 3. Admin cannot delete self (400)
+    admin_self_del = client.delete("/api/auth/users/11111111-1111-1111-1111-111111111111", headers=admin_headers())
+    assert admin_self_del.status_code == 400
+    assert "Cannot delete your own active administrator account" in admin_self_del.json()["detail"]
+
+    # 4. Admin successfully deletes user (200)
+    del_res = client.delete(f"/api/auth/users/{user_id}", headers=admin_headers())
+    assert del_res.status_code == 200
+    assert del_res.json()["id"] == user_id
+
+    # 5. User cannot login anymore
+    login_res = client.post("/api/auth/login", json={"email": target_email, "password": "password123"})
+    assert login_res.status_code == 401
+
+    # 6. User is deleted from SQLite
+    sqlite_users = _load_users_sqlite()
+    assert not any(u["id"] == user_id for u in sqlite_users)

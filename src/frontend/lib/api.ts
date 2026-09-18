@@ -306,5 +306,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ role }),
     }),
+  deleteUser: (userId: string) =>
+    fetchWithAuth<{ message: string; id: string }>(`/api/auth/users/${userId}`, {
+      method: "DELETE",
+    }),
 };
 

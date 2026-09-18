@@ -92,7 +92,11 @@ export function AppShell({
 
   const handleLogout = () => {
     clearAuthToken();
-    router.replace("/login");
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    } else {
+      router.replace("/login");
+    }
   };
 
   if (isLoadingAuth) {
