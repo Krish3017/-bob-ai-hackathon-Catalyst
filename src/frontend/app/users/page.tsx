@@ -102,11 +102,11 @@ export default function UsersPage() {
         role: createRole,
       });
 
-      // Instantly add to frontend table
-      setUsers((prev) => [newUser, ...prev]);
+      // Re-fetch users from database to ensure persistence
+      await fetchUsersData();
 
       toast.success(
-        "Personnel Registered",
+        "User Created",
         `${newUser.full_name} was successfully created with role ${newUser.role.toUpperCase()}.`
       );
 
@@ -263,7 +263,7 @@ export default function UsersPage() {
                   Personnel Directory & Privilege Matrix
                 </CardTitle>
                 <p className="text-xs text-[#5C6B68] mt-0.5">
-                  Promote new viewer signups to Operations or Administrator roles.
+                  Manage port personnel accounts, assign operational roles, and review privileges.
                 </p>
               </div>
               {/* In-page User Registration Button */}
@@ -277,7 +277,7 @@ export default function UsersPage() {
                 }}
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Sign Up New User
+                Create User
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -451,7 +451,7 @@ export default function UsersPage() {
                       <Eye className="h-3.5 w-3.5" /> Viewer / Executive
                     </span>
                     <p className="text-[#5C6B68] text-[11px]">
-                      Read-only access. Default role assigned upon public signup. Can view port KPIs, congestion indices, Gantt charts, and disruption logs without modification rights.
+                      Read-only access. Can view port KPIs, congestion indices, Gantt charts, and disruption logs without modification rights.
                     </p>
                   </div>
                 </div>
@@ -462,7 +462,7 @@ export default function UsersPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
-      {/*              MODAL: REGISTER NEW USER / PERSONNEL               */}
+      {/*              MODAL: CREATE NEW USER                             */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -472,8 +472,8 @@ export default function UsersPage() {
             setCreateError(null);
           }
         }}
-        title="Register New Port Personnel"
-        description="Create a new personnel account with immediate role privileges. Stays within your admin session."
+        title="Create New User"
+        description="Create a user account with assigned operational role. Persisted directly in the database."
         maxWidth="md"
       >
         <form onSubmit={handleCreateUser} className="space-y-4 pt-1">

@@ -22,6 +22,7 @@ export interface ResolvedVesselDisplay {
   labelOffsetY: number;
   labelOffsetX: number;
   priorityLevel: number; // 1 = highest priority (selected/hovered/delayed)
+  isSecondaryBerthed?: boolean;
 }
 
 // ---------------------------------------------------------------------------

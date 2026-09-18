@@ -16,57 +16,15 @@ from app.core.auth import get_current_user, require_role, create_access_token, h
 router = APIRouter(prefix="/api/auth", tags=["Authentication & RBAC"])
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-def signup(req: SignupRequest):
+@router.post("/signup", status_code=status.HTTP_403_FORBIDDEN)
+def signup():
     """
-    Register new port personnel.
-    Per security policy: All newly registered accounts are assigned the 'viewer' role by default.
-    A Port Manager / Admin can elevate permissions to 'operations' or 'admin' from the Users Directory.
+    Public registration is strictly disabled.
+    All user accounts must be provisioned by an authorized administrator from Admin -> Users.
     """
-    email_clean = req.email.strip().lower()
-
-    if not req.password or len(req.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters long."
-        )
-
-    # Check for existing email
-    for u in port_repo.users.values():
-        if u.get("email", "").lower() == email_clean:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"An account with email '{email_clean}' is already registered."
-            )
-
-    new_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
-
-    user_data = {
-        "id": new_id,
-        "email": email_clean,
-        "full_name": req.full_name.strip(),
-        "role": "viewer",  # Strictly start as viewer as required
-        "department": req.department.strip() if req.department else "Port Logistics",
-        "password_hash": hash_password(req.password),
-        "created_at": now
-    }
-
-    # Store in repository (which syncs to Supabase PostgreSQL)
-    port_repo.users[new_id] = user_data
-
-    # Generate JWT token
-    token = create_access_token({
-        "sub": new_id,
-        "email": email_clean,
-        "role": "viewer",
-        "name": user_data["full_name"],
-        "department": user_data["department"]
-    })
-
-    return AuthResponse(
-        token=token,
-        user=UserResponse(**user_data)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Public registration is disabled. All user accounts must be provisioned by a Port Administrator."
     )
 
 

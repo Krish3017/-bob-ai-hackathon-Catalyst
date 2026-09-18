@@ -21,7 +21,6 @@ class UserResponse(UserBase):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, description="User password")
-    role: Optional[str] = None
 
 
 class SignupRequest(BaseModel):
