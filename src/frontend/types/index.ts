@@ -199,3 +199,26 @@ export interface SentinelAlertResponse {
   recommended_action: string;
   runbook_plan_ready: boolean;
 }
+
+export interface PortTwinApiBerth extends Berth {
+  current_vessel_name?: string | null;
+  assigned_cranes?: string[];
+}
+
+export interface PortTwinApiCrane extends Crane {
+  assigned_berth_code?: string | null;
+}
+
+export interface PortTwinApiVessel extends Vessel {
+  assigned_berth_code?: string | null;
+}
+
+export interface PortTwinApiResponse {
+  vessels: PortTwinApiVessel[];
+  berths: PortTwinApiBerth[];
+  cranes: PortTwinApiCrane[];
+  yards: Yard[];
+  disruptions: Disruption[];
+  server_time: string;
+}
+

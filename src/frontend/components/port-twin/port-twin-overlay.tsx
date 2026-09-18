@@ -53,6 +53,8 @@ interface PortTwinOverlayProps {
   onPanDown?: () => void;
   onPanLeft?: () => void;
   onPanRight?: () => void;
+  connectionStatus?: "connected" | "connecting" | "offline";
+  lastSyncTime?: string | null;
   // Optional legacy props for backwards compatibility
   isPlaying?: boolean;
   onTogglePlay?: () => void;
@@ -87,6 +89,8 @@ export function PortTwinOverlay({
   onPanDown,
   onPanLeft,
   onPanRight,
+  connectionStatus = "connected",
+  lastSyncTime,
   stats,
 }: PortTwinOverlayProps) {
   const [layersOpen, setLayersOpen] = useState(false);
@@ -98,16 +102,46 @@ export function PortTwinOverlay({
         {/* Left: Port Identifier */}
         <div className="pointer-events-auto flex items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white/95 px-3 py-1.5 text-slate-800 shadow-md backdrop-blur-sm">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span
+              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                connectionStatus === "connected"
+                  ? "bg-emerald-400"
+                  : connectionStatus === "connecting"
+                  ? "bg-amber-400"
+                  : "bg-slate-400"
+              }`}
+            ></span>
+            <span
+              className={`relative inline-flex rounded-full h-2 w-2 ${
+                connectionStatus === "connected"
+                  ? "bg-emerald-500"
+                  : connectionStatus === "connecting"
+                  ? "bg-amber-500"
+                  : "bg-slate-500"
+              }`}
+            ></span>
           </span>
           <span className="text-xs font-bold tracking-tight text-slate-900">
             Tuas Terminal Digital Twin
           </span>
           <span className="text-slate-300">|</span>
-          <div className="flex items-center gap-1 text-[11px] font-mono text-blue-700 font-medium">
+          <div className="flex items-center gap-1.5 text-[11px] font-mono font-medium">
             <Radio className="h-3 w-3 text-blue-600" />
-            <span>GIS 2.5D</span>
+            <span
+              className={
+                connectionStatus === "connected"
+                  ? "text-emerald-700"
+                  : connectionStatus === "connecting"
+                  ? "text-amber-700"
+                  : "text-slate-600"
+              }
+            >
+              {connectionStatus === "connected"
+                ? `DB Live (${lastSyncTime || "synced"})`
+                : connectionStatus === "connecting"
+                ? "Connecting DB..."
+                : "Offline Baseline"}
+            </span>
           </div>
         </div>
 

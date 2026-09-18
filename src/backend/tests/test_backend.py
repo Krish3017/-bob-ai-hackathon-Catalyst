@@ -378,3 +378,43 @@ def test_disruption_sentinel_endpoint():
     assert "recommended_action" in data
 
 
+def test_port_twin_endpoint():
+    # Test GET /api/port-twin returning database-backed operational dataset
+    res = client.get("/api/port-twin")
+    assert res.status_code == 200
+    data = res.json()
+    assert "vessels" in data
+    assert "berths" in data
+    assert "cranes" in data
+    assert "yards" in data
+    assert "disruptions" in data
+    assert "server_time" in data
+
+    # Verify berths have enriched vessel and assigned crane data
+    assert len(data["berths"]) >= 5
+    for b in data["berths"]:
+        assert "berth_code" in b
+        assert "status" in b
+
+    # Verify cranes have status and berth associations
+    assert len(data["cranes"]) >= 10
+    for c in data["cranes"]:
+        assert "crane_code" in c
+        assert "status" in c
+        assert c["status"] in ["Available", "Busy", "Maintenance", "Failed"]
+
+    # Verify vessels have operational status and length
+    assert len(data["vessels"]) >= 10
+    for v in data["vessels"]:
+        assert "vessel_code" in v
+        assert "vessel_name" in v
+        assert "status" in v
+
+    # Verify yards have utilization percentage
+    assert len(data["yards"]) >= 5
+    for y in data["yards"]:
+        assert "yard_code" in y
+        assert "utilization_percentage" in y
+
+
+

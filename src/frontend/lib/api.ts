@@ -13,6 +13,7 @@ import {
   SimulateOptimizationRequest,
   SimulationResponse,
   SentinelAlertResponse,
+  PortTwinApiResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -207,6 +208,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ run_id: runId }),
     }),
+
+  // Live Port Digital Twin Telemetry
+  getPortTwinData: () => fetchWithAuth<PortTwinApiResponse>("/api/port-twin"),
 
   // Copilot — Chat
   copilotChat: (

@@ -8,25 +8,25 @@ export function Ocean() {
 
   return (
     <group position={[0, -0.02, 0]}>
-      {/* 1. Primary Pale Blue Nautical Water Surface */}
+      {/* 1. Primary Light Theme Nautical Water Surface (Clean distinguishable water) */}
       <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[800, 800]} />
+        <planeGeometry args={[1400, 1400]} />
         <meshStandardMaterial
-          color="#dbeafe"
-          roughness={0.6}
-          metalness={0.1}
+          color="#b8d5f2"
+          roughness={0.65}
+          metalness={0.08}
         />
       </mesh>
 
-      {/* 2. Coastal Harbor Shelf Basin Under Quay (Subtle soft tone) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 10]} receiveShadow>
-        <planeGeometry args={[240, 130]} />
+      {/* 2. Coastal Harbor Basin Under Quay (Subtle depth shelf) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 12]} receiveShadow>
+        <planeGeometry args={[260, 140]} />
         <meshStandardMaterial
-          color="#d0e3f7"
+          color="#a8caed"
           roughness={0.7}
           metalness={0.05}
           transparent
-          opacity={0.8}
+          opacity={0.85}
         />
       </mesh>
 
@@ -36,11 +36,11 @@ export function Ocean() {
         position={[45, 0.02, 35]}
         receiveShadow
       >
-        <planeGeometry args={[200, 52]} />
+        <planeGeometry args={[240, 56]} />
         <meshStandardMaterial
-          color="#c2ddf8"
-          roughness={0.5}
-          metalness={0.1}
+          color="#9ec2e8"
+          roughness={0.6}
+          metalness={0.05}
         />
       </mesh>
 
@@ -49,20 +49,20 @@ export function Ocean() {
         rotation={[-Math.PI / 2, 0, 0.38]}
         position={[25, 0.03, 50]}
       >
-        <planeGeometry args={[190, 0.4]} />
-        <meshBasicMaterial color="#93c5fd" />
+        <planeGeometry args={[230, 0.35]} />
+        <meshBasicMaterial color="#60a5fa" transparent opacity={0.6} />
       </mesh>
       <mesh
         rotation={[-Math.PI / 2, 0, 0.38]}
         position={[65, 0.03, 20]}
       >
-        <planeGeometry args={[190, 0.4]} />
-        <meshBasicMaterial color="#93c5fd" />
+        <planeGeometry args={[230, 0.35]} />
+        <meshBasicMaterial color="#60a5fa" transparent opacity={0.6} />
       </mesh>
 
-      {/* 4. Subtle Nautical Chart Grid Reference */}
+      {/* 4. Subtle Nautical Hydrographic Chart Grid Reference */}
       <gridHelper
-        args={[600, 50, "#bfdbfe", "#cbd5e1"]}
+        args={[800, 60, "#93c5fd", "#cbd5e1"]}
         position={[0, 0.03, 0]}
       />
     </group>
