@@ -8,7 +8,7 @@ import { Badge } from "@/design-system/badge";
 import { Button } from "@/design-system/button";
 import { AddDisruptionModal } from "@/components/dialogs/add-disruption-modal";
 import { api } from "@/lib/api";
-import { Disruption, Berth, Crane } from "@/types";
+import { Disruption, Berth, Crane, Yard } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 import { AlertTriangle, Plus, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/components/design-system/toast";
@@ -18,6 +18,7 @@ export default function DisruptionsPage() {
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [berths, setBerths] = useState<Berth[]>([]);
   const [cranes, setCranes] = useState<Crane[]>([]);
+  const [yards, setYards] = useState<Yard[]>([]);
   const [currentRole, setCurrentRole] = useState<string>("viewer");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const toast = useToast();
@@ -28,14 +29,16 @@ export default function DisruptionsPage() {
       setCurrentRole(localStorage.getItem("naviops_role") || "viewer");
     }
     try {
-      const [dList, bList, cList] = await Promise.all([
+      const [dList, bList, cList, yList] = await Promise.all([
         api.getDisruptions(),
         api.getBerths(),
         api.getCranes(),
+        api.getYards(),
       ]);
       setDisruptions(dList);
       setBerths(bList);
       setCranes(cList);
+      setYards(yList);
     } catch (err) {
       console.error(err);
     }
@@ -148,65 +151,91 @@ export default function DisruptionsPage() {
               {disruptions.length === 0 ? (
                 <TableEmpty message="No disruptions currently recorded." colSpan={7} />
               ) : (
-                disruptions.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-semibold text-[#102A27]">
-                      <div>{d.title}</div>
-                      {d.description && (
-                        <div className="text-xs text-[#5C6B68] font-normal max-w-sm line-clamp-1">
-                          {d.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-[#5C6B68]">{d.disruption_type}</TableCell>
-                    <TableCell className="text-xs uppercase font-mono font-medium text-[#102A27]">
-                      {d.affected_resource_type}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="status" status={d.severity} context="disruption">
-                        {d.severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-[#5C6B68]">{formatDateTime(d.start_time)}</TableCell>
-                    <TableCell>
-                      <Badge variant="status" status={d.status} context="disruption">
-                        {d.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {currentRole !== "viewer" && d.status === "Active" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-                            onClick={() => handleResolve(d.id)}
-                            leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
-                          >
-                            Resolve
-                          </Button>
+                disruptions.map((d) => {
+                  let specificResourceName = "";
+                  if (d.affected_resource_id) {
+                    if (d.affected_resource_type === "crane") {
+                      const c = cranes.find((item) => item.id === d.affected_resource_id);
+                      if (c) specificResourceName = `${c.crane_code} (${c.crane_name})`;
+                    } else if (d.affected_resource_type === "berth") {
+                      const b = berths.find((item) => item.id === d.affected_resource_id);
+                      if (b) specificResourceName = `${b.berth_code} (${b.berth_name})`;
+                    } else if (d.affected_resource_type === "yard") {
+                      const y = yards.find((item) => item.id === d.affected_resource_id);
+                      if (y) specificResourceName = `${y.yard_code} (${y.yard_name})`;
+                    }
+                  }
+
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-semibold text-[#102A27]">
+                        <div>{d.title}</div>
+                        {d.description && (
+                          <div className="text-xs text-[#5C6B68] font-normal max-w-sm line-clamp-1">
+                            {d.description}
+                          </div>
                         )}
-                        {currentRole === "admin" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-rose-600 hover:text-rose-700"
-                            onClick={() => handleDelete(d.id)}
-                            title="Delete incident (Admin Only)"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {currentRole === "viewer" && (
-                          <span className="text-[11px] text-[#899491] font-medium italic">
-                            Read-Only
+                      </TableCell>
+                      <TableCell className="text-xs text-[#5C6B68]">{d.disruption_type}</TableCell>
+                      <TableCell className="text-xs font-medium text-[#102A27]">
+                        <span className="uppercase font-mono text-[11px] text-[#004741] font-semibold block">
+                          {d.affected_resource_type}
+                        </span>
+                        {specificResourceName ? (
+                          <span className="text-[11px] text-[#5C6B68] block mt-0.5">
+                            {specificResourceName}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#899491] italic block mt-0.5">
+                            Port-wide
                           </span>
                         )}
-                      </div>
-                    </TableCell>
-
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="status" status={d.severity} context="disruption">
+                          {d.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-[#5C6B68]">{formatDateTime(d.start_time)}</TableCell>
+                      <TableCell>
+                        <Badge variant="status" status={d.status} context="disruption">
+                          {d.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {currentRole !== "viewer" && d.status === "Active" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                              onClick={() => handleResolve(d.id)}
+                              leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+                            >
+                              Resolve
+                            </Button>
+                          )}
+                          {currentRole === "admin" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-600 hover:text-rose-700"
+                              onClick={() => handleDelete(d.id)}
+                              title="Delete incident (Admin Only)"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {currentRole === "viewer" && (
+                            <span className="text-[11px] text-[#899491] font-medium italic">
+                              Read-Only
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -219,6 +248,7 @@ export default function DisruptionsPage() {
         onSuccess={loadAll}
         berths={berths}
         cranes={cranes}
+        yards={yards}
       />
     </AppShell>
   );

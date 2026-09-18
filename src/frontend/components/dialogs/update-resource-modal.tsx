@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "@/design-system/modal";
 import { Button } from "@/design-system/button";
 import { FormField, Input, Select } from "@/design-system/form-field";
@@ -34,6 +34,16 @@ export function UpdateResourceModal({
   );
   const toast = useToast();
   const confirm = useConfirm();
+
+  // Ensure state synchronizes immediately whenever a different resource is selected or modal opens
+  useEffect(() => {
+    if (resource) {
+      setStatus(resource.status || "");
+      setPriority(resource.priority ?? 2);
+      setOccupiedCapacity(resource.occupied_capacity ?? 0);
+      setExpectedWait(resource.expected_waiting_time ?? 0);
+    }
+  }, [resource, isOpen]);
 
   if (!resource) return null;
 

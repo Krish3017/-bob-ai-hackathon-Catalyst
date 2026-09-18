@@ -9,7 +9,7 @@ import { AddVesselModal } from "@/components/dialogs/add-vessel-modal";
 import { AddDisruptionModal } from "@/components/dialogs/add-disruption-modal";
 import { UpdateResourceModal } from "@/components/dialogs/update-resource-modal";
 import { api } from "@/lib/api";
-import { Vessel, Berth, Crane } from "@/types";
+import { Vessel, Berth, Crane, Yard } from "@/types";
 import { formatDateTime, formatDuration } from "@/lib/utils";
 import {
   Plus,
@@ -32,6 +32,7 @@ export default function OperationsPage() {
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [berths, setBerths] = useState<Berth[]>([]);
   const [cranes, setCranes] = useState<Crane[]>([]);
+  const [yards, setYards] = useState<Yard[]>([]);
   const [currentRole, setCurrentRole] = useState<string>("operations");
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
@@ -60,14 +61,16 @@ export default function OperationsPage() {
   const loadAll = async () => {
     try {
       setRefreshing(true);
-      const [vList, bList, cList] = await Promise.all([
+      const [vList, bList, cList, yList] = await Promise.all([
         api.getVessels(),
         api.getBerths(),
         api.getCranes(),
+        api.getYards(),
       ]);
       setVessels(vList);
       setBerths(bList);
       setCranes(cList);
+      setYards(yList);
     } catch (err) {
       console.error("Error loading operational data:", err);
     } finally {
@@ -374,6 +377,7 @@ export default function OperationsPage() {
         onSuccess={loadAll}
         berths={berths}
         cranes={cranes}
+        yards={yards}
       />
 
       {updateModalData.isOpen && (

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "@/design-system/modal";
 import { Button } from "@/design-system/button";
 import { FormField, Input, Select, Textarea } from "@/design-system/form-field";
 import { api } from "@/lib/api";
-import { Berth, Crane } from "@/types";
+import { Berth, Crane, Yard } from "@/types";
 import { useToast } from "@/components/design-system/toast";
 
 interface AddDisruptionModalProps {
@@ -14,6 +14,7 @@ interface AddDisruptionModalProps {
   onSuccess: () => void;
   berths: Berth[];
   cranes: Crane[];
+  yards?: Yard[];
 }
 
 export function AddDisruptionModal({
@@ -22,6 +23,7 @@ export function AddDisruptionModal({
   onSuccess,
   berths,
   cranes,
+  yards = [],
 }: AddDisruptionModalProps) {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
@@ -30,9 +32,22 @@ export function AddDisruptionModal({
     title: "",
     description: "",
     affected_resource_type: "crane",
-    affected_resource_id: cranes[0]?.id || "",
+    affected_resource_id: "",
     severity: "High",
   });
+
+  // Ensure default affected_resource_id is properly initialized whenever modal opens or resources load
+  useEffect(() => {
+    if (isOpen) {
+      if (formData.affected_resource_type === "crane" && cranes.length > 0) {
+        setFormData((prev) => ({ ...prev, affected_resource_id: prev.affected_resource_id || cranes[0].id }));
+      } else if (formData.affected_resource_type === "berth" && berths.length > 0) {
+        setFormData((prev) => ({ ...prev, affected_resource_id: prev.affected_resource_id || berths[0].id }));
+      } else if (formData.affected_resource_type === "yard" && yards.length > 0) {
+        setFormData((prev) => ({ ...prev, affected_resource_id: prev.affected_resource_id || yards[0].id }));
+      }
+    }
+  }, [isOpen, cranes, berths, yards, formData.affected_resource_type]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +63,7 @@ export function AddDisruptionModal({
         description: formData.description.trim(),
         affected_resource_type: formData.affected_resource_type as any,
         affected_resource_id:
-          formData.affected_resource_type === "port" ? null : formData.affected_resource_id,
+          formData.affected_resource_type === "port" ? null : formData.affected_resource_id || null,
         severity: formData.severity as any,
         status: "Active",
       });
@@ -118,18 +133,18 @@ export function AddDisruptionModal({
           <FormField label="Affected Resource Type" required>
             <Select
               value={formData.affected_resource_type}
-              onChange={(e) =>
+              onChange={(e) => {
+                const newType = e.target.value;
+                let defaultId = "";
+                if (newType === "crane") defaultId = cranes[0]?.id || "";
+                else if (newType === "berth") defaultId = berths[0]?.id || "";
+                else if (newType === "yard") defaultId = yards[0]?.id || "";
                 setFormData({
                   ...formData,
-                  affected_resource_type: e.target.value,
-                  affected_resource_id:
-                    e.target.value === "crane"
-                      ? cranes[0]?.id || ""
-                      : e.target.value === "berth"
-                      ? berths[0]?.id || ""
-                      : "",
-                })
-              }
+                  affected_resource_type: newType,
+                  affected_resource_id: defaultId,
+                });
+              }}
             >
               <option value="crane">Quay Crane (STS)</option>
               <option value="berth">Berth Terminal</option>
@@ -162,6 +177,21 @@ export function AddDisruptionModal({
                 {berths.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.berth_code} — {b.berth_name} ({b.status})
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          )}
+
+          {formData.affected_resource_type === "yard" && (
+            <FormField label="Select Yard Zone" required>
+              <Select
+                value={formData.affected_resource_id}
+                onChange={(e) => setFormData({ ...formData, affected_resource_id: e.target.value })}
+              >
+                {yards.map((y) => (
+                  <option key={y.id} value={y.id}>
+                    {y.yard_code} — {y.yard_name} ({y.status})
                   </option>
                 ))}
               </Select>

@@ -77,7 +77,7 @@ export default function DashboardPage() {
   const attentionItems: AttentionItem[] = [];
 
   if (summary?.active_disruptions && summary.active_disruptions.length > 0) {
-    summary.active_disruptions.slice(0, 2).forEach((d) => {
+    summary.active_disruptions.forEach((d) => {
       attentionItems.push({
         id: `disruption-${d.id}`,
         severity: d.severity === "Critical" ? "critical" : "warning",
@@ -103,8 +103,7 @@ export default function DashboardPage() {
   const delayedVessels = vessels.filter(
     (v) => (v.status === "Waiting" && v.expected_waiting_time >= 3) || v.status === "Delayed"
   );
-  if (delayedVessels.length > 0) {
-    const v = delayedVessels[0];
+  delayedVessels.forEach((v) => {
     attentionItems.push({
       id: `vessel-wait-${v.id}`,
       severity: "warning",
@@ -113,7 +112,7 @@ export default function DashboardPage() {
       actionLabel: "Assign Berth",
       actionHref: "/operations",
     });
-  }
+  });
 
   if ((metrics?.yard_utilization_rate || 0) >= 80) {
     attentionItems.push({

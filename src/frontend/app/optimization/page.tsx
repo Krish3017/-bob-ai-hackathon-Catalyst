@@ -804,7 +804,7 @@ export default function OptimizationPage() {
                 Simulate Offline Cranes ({simCranes.length} selected)
               </label>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                {cranes.slice(0, 10).map((c) => {
+                {cranes.map((c) => {
                   const isSelected = simCranes.includes(c.id);
                   return (
                     <button
