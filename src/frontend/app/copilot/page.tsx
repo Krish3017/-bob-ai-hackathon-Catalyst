@@ -455,8 +455,8 @@ function ConversationHistory({
           title="Start a new conversation"
           aria-label="Start a new conversation"
         >
-          <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">New</span>
+          <MessageSquarePlus className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
+          <span>New Chat</span>
         </button>
 
         {/* History dropdown trigger */}
@@ -484,6 +484,16 @@ function ConversationHistory({
           role="listbox"
           aria-label="Conversation history"
         >
+          <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onNew(); }}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 py-1.5 px-3 text-[12px] font-medium transition-colors border border-blue-200/50"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              <span>Start New Chat</span>
+            </button>
+          </div>
           {conversations.length === 0 ? (
             <div className="px-4 py-6 text-center text-[12px] text-slate-400">
               No previous conversations
@@ -605,7 +615,7 @@ export default function CopilotPage() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [convListLoading, setConvListLoading] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -642,7 +652,6 @@ export default function CopilotPage() {
 
   // Load a conversation from history
   const loadConversation = useCallback(async (convId: string) => {
-    setMessages([]);
     setActiveConvId(convId);
     if (typeof window !== "undefined") {
       localStorage.setItem("naviops_copilot_conv_id", convId);
@@ -662,63 +671,94 @@ export default function CopilotPage() {
       }));
       setMessages(loaded);
     } catch {
-      addMessage({ kind: "error", text: "Could not load conversation history. Chat still works." });
+      setActiveConvId(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("naviops_copilot_conv_id");
+      }
+      setMessages([]);
       toast.warning("Conversation history", "Could not load prior messages from storage.");
+    } finally {
+      setIsInitialLoading(false);
     }
     setTimeout(() => inputRef.current?.focus(), 50);
-  }, [addMessage, toast]);
+  }, [toast]);
+
+  // Stable ref for loadConversation
+  const loadConversationRef = useRef(loadConversation);
+  useEffect(() => {
+    loadConversationRef.current = loadConversation;
+  });
 
   // Start a fresh conversation
   const handleNewConversation = useCallback(() => {
     setMessages([]);
     setActiveConvId(null);
+    setInputVal("");
+    setIsLoading(false);
+    setIsActionLoading(false);
     if (typeof window !== "undefined") {
       localStorage.removeItem("naviops_copilot_conv_id");
     }
     setToolSteps([]);
     setPendingAction(null);
+    setIsInitialLoading(false);
     toast.info("New conversation", "Started a fresh Bob AI Copilot session.");
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [toast]);
 
-  // On mount: load conversation list, then restore the last active conversation or most recent one
+  // On mount: load conversation list once. Only restore if savedId is explicitly in localStorage.
   useEffect(() => {
     let isMounted = true;
     setConvListLoading(true);
-    setIsInitialLoading(true);
+
+    const savedId = typeof window !== "undefined" ? localStorage.getItem("naviops_copilot_conv_id") : null;
+    if (savedId) {
+      setIsInitialLoading(true);
+    }
 
     api.listConversations()
       .then(async (list) => {
         if (!isMounted) return;
         setConversations(list);
 
-        // Restore the last active conversation the user was working in, or the most recent one
-        const savedId = typeof window !== "undefined" ? localStorage.getItem("naviops_copilot_conv_id") : null;
-        const targetConv = (savedId && list.find((c) => c.id === savedId)) || (list.length > 0 ? list[0] : null);
+        // Only restore conversation if an active conversation ID was previously saved
+        const targetConv = savedId ? list.find((c) => c.id === savedId) : null;
 
         if (targetConv && isMounted) {
-          await loadConversation(targetConv.id);
+          await loadConversationRef.current(targetConv.id);
+        } else if (isMounted) {
+          setIsInitialLoading(false);
+          if (savedId) {
+            localStorage.removeItem("naviops_copilot_conv_id");
+            setActiveConvId(null);
+          }
         }
       })
-      .catch(() => {
-        /* DB unavailable — list stays empty, chat still works */
+      .catch((err) => {
+        console.warn("Could not load conversations:", err);
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
       })
       .finally(() => {
         if (isMounted) {
           setConvListLoading(false);
-          setIsInitialLoading(false);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [loadConversation]);
+  }, []);
 
-  // Persist active conversation ID to localStorage whenever it changes to a valid ID
+  // Persist active conversation ID to localStorage
   useEffect(() => {
-    if (activeConvId && typeof window !== "undefined") {
-      localStorage.setItem("naviops_copilot_conv_id", activeConvId);
+    if (typeof window !== "undefined") {
+      if (activeConvId) {
+        localStorage.setItem("naviops_copilot_conv_id", activeConvId);
+      } else {
+        localStorage.removeItem("naviops_copilot_conv_id");
+      }
     }
   }, [activeConvId]);
 
@@ -790,7 +830,7 @@ export default function CopilotPage() {
 
         const replyText = response.reply;
         const toolsUsed = response.tools_used ?? [];
-        const returnedConvId = response.session_id ?? null;
+        const returnedConvId = response.conversation_id || response.session_id || null;
 
         finalizeToolProgress(toolsUsed);
 
@@ -801,14 +841,14 @@ export default function CopilotPage() {
         });
 
         // If a new conversation was created by the backend, adopt its ID
-        if (returnedConvId && returnedConvId !== activeConvId) {
-          setActiveConvId(returnedConvId);
-          // Refresh the conversation list entry (title comes from backend)
-          api.listConversations()
-            .then((list) => setConversations(list))
-            .catch(() => {});
-        } else if (returnedConvId) {
-          // Update updated_at in the list
+        if (returnedConvId) {
+          if (returnedConvId !== activeConvId) {
+            setActiveConvId(returnedConvId);
+          }
+          if (typeof window !== "undefined") {
+            localStorage.setItem("naviops_copilot_conv_id", returnedConvId);
+          }
+          // Refresh the conversation list
           api.listConversations()
             .then((list) => setConversations(list))
             .catch(() => {});
@@ -901,7 +941,7 @@ export default function CopilotPage() {
           role="list"
         >
           <div className="max-w-3xl mx-auto space-y-4">
-            {isInitialLoading ? (
+            {isInitialLoading && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[280px] text-slate-400">
                 <Loader2 className="h-6 w-6 animate-spin text-blue-500 mb-2" />
                 <span className="text-[12px] font-medium text-slate-500">Loading conversation…</span>

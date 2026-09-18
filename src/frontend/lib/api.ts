@@ -222,6 +222,7 @@ export const api = {
     fetchWithAuth<{
       reply: string;
       session_id?: string;
+      conversation_id?: string;
       model: string;
       role_context: string;
       tools_used?: string[] | null;
