@@ -243,8 +243,8 @@ export default function OptimizationPage() {
     <AppShell
       title="72-Hour Operational Schedule Optimizer"
       description="Mathematical combinatorial solver (Google OR-Tools CP-SAT) for berth allocations and crane dispatch."
-      congestionScore={congestion?.score || 45}
-      congestionLevel={getCongestionMeta(congestion?.score || 45).label}
+      congestionScore={congestion?.score ?? 0}
+      congestionLevel={getCongestionMeta(congestion?.score ?? 0).label}
       onRefresh={loadData}
       isRefreshing={loading}
     >
@@ -385,7 +385,7 @@ export default function OptimizationPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-1">
             <span className="text-xl font-bold font-mono text-[#2F7D5B]">
-              +${(metrics?.demurrage_saved_usd ?? 142500).toLocaleString()}
+              +${(metrics?.demurrage_saved_usd ?? 0).toLocaleString()}
             </span>
           </div>
           <div className="mt-2 text-[10px] font-semibold text-[#2F7D5B] border-t border-[#F0EDE4] pt-1.5 truncate">
@@ -401,7 +401,7 @@ export default function OptimizationPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-1.5">
             <span className="text-xl font-bold font-mono text-[#2F7D8C]">
-              {(metrics?.co2_abated_mt ?? 38.4).toFixed(1)}
+              {(metrics?.co2_abated_mt ?? 0).toFixed(1)}
             </span>
             <span className="text-[11px] text-[#5C6B68]">MT</span>
           </div>
@@ -418,7 +418,7 @@ export default function OptimizationPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-1.5">
             <span className="text-xl font-bold text-[#102A27]">
-              {Math.round((metrics?.berth_occupancy_ratio || 0.75) * 100)}%
+              {Math.round((metrics?.berth_occupancy_ratio ?? 0) * 100)}%
             </span>
           </div>
           <div className="mt-2 text-[10px] text-[#5C6B68] border-t border-[#F0EDE4] pt-1.5 truncate">

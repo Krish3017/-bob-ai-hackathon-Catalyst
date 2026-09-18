@@ -25,6 +25,17 @@ def get_all_disruptions(
     disruptions = list(port_repo.disruptions.values())
     if status:
         disruptions = [d for d in disruptions if d.get("status", "").lower() == status.lower()]
+
+    # Deduplicate by id to prevent any in-memory double-counting
+    seen_ids = set()
+    unique_disruptions = []
+    for d in disruptions:
+        did = d.get("id")
+        if did and did not in seen_ids:
+            seen_ids.add(did)
+            unique_disruptions.append(d)
+    disruptions = unique_disruptions
+
     disruptions.sort(key=lambda d: str(d.get("created_at", "")), reverse=True)
     return [DisruptionResponse(**d) for d in disruptions]
 

@@ -523,6 +523,18 @@ class PortRepository:
         self.disruptions.clear()
         self.optimization_runs.clear()
         self.schedules.clear()
+
+        # Also clear PostgreSQL tables so seed data doesn't duplicate existing rows
+        if self.is_connected:
+            try:
+                conn = self.get_connection()
+                if conn:
+                    with conn.cursor() as cur:
+                        for table in ["schedules", "optimization_runs", "disruptions", "vessels", "yards", "cranes", "berths"]:
+                            cur.execute(f"DELETE FROM {table}")
+            except Exception as e:
+                logger.error(f"Failed to clear PostgreSQL during reset: {e}")
+
         self.seed_defaults()
 
     def seed_defaults(self):
@@ -626,50 +638,51 @@ class PortRepository:
         for v in vessels_seed:
             super(SyncedTable, self.vessels).__setitem__(v["id"], v)
 
-        # 6. Disruptions
-        disruptions_seed = [
-            {
-                "id": "d0000001-0000-0000-0000-000000000001",
-                "disruption_type": "Equipment Failure",
-                "title": "CR-04 Hydraulic Hoist Failure",
-                "description": "Quay crane CR-04 experienced primary hoist hydraulic seal breach during high-speed hoist cycle. Engineering team dispatched.",
-                "affected_resource_type": "crane",
-                "affected_resource_id": "c0000004-0000-0000-0000-000000000004",
-                "severity": "High",
-                "start_time": now - timedelta(hours=3),
-                "end_time": now + timedelta(hours=25),
-                "status": "Active",
-                "created_at": now - timedelta(hours=3)
-            },
-            {
-                "id": "d0000002-0000-0000-0000-000000000002",
-                "disruption_type": "Berth Maintenance",
-                "title": "Berth B-02 High-Impact Fender Replacement",
-                "description": "Structural refurbishment of marine pneumatic rubber fenders along section 4 of Berth B-02. Berthing suspended.",
-                "affected_resource_type": "berth",
-                "affected_resource_id": "b0000002-0000-0000-0000-000000000002",
-                "severity": "Critical",
-                "start_time": now - timedelta(hours=6),
-                "end_time": now + timedelta(hours=18),
-                "status": "Active",
-                "created_at": now - timedelta(hours=6)
-            },
-            {
-                "id": "d0000003-0000-0000-0000-000000000003",
-                "disruption_type": "Weather",
-                "title": "Heavy Outer Fog & Channel Speed Restriction",
-                "description": "Harbor pilotage restricted navigation speed to 6 knots in outer fairway due to dense advection fog.",
-                "affected_resource_type": "port",
-                "affected_resource_id": None,
-                "severity": "Medium",
-                "start_time": now - timedelta(hours=2),
-                "end_time": now + timedelta(hours=8),
-                "status": "Active",
-                "created_at": now - timedelta(hours=2)
-            }
-        ]
-        for d in disruptions_seed:
-            super(SyncedTable, self.disruptions).__setitem__(d["id"], d)
+        # 6. Disruptions — only seed if no disruptions exist in database
+        if len(self.disruptions) == 0:
+            disruptions_seed = [
+                {
+                    "id": "d0000001-0000-0000-0000-000000000001",
+                    "disruption_type": "Equipment Failure",
+                    "title": "CR-04 Hydraulic Hoist Failure",
+                    "description": "Quay crane CR-04 experienced primary hoist hydraulic seal breach during high-speed hoist cycle. Engineering team dispatched.",
+                    "affected_resource_type": "crane",
+                    "affected_resource_id": "c0000004-0000-0000-0000-000000000004",
+                    "severity": "High",
+                    "start_time": now - timedelta(hours=3),
+                    "end_time": now + timedelta(hours=25),
+                    "status": "Active",
+                    "created_at": now - timedelta(hours=3)
+                },
+                {
+                    "id": "d0000002-0000-0000-0000-000000000002",
+                    "disruption_type": "Berth Maintenance",
+                    "title": "Berth B-02 High-Impact Fender Replacement",
+                    "description": "Structural refurbishment of marine pneumatic rubber fenders along section 4 of Berth B-02. Berthing suspended.",
+                    "affected_resource_type": "berth",
+                    "affected_resource_id": "b0000002-0000-0000-0000-000000000002",
+                    "severity": "Critical",
+                    "start_time": now - timedelta(hours=6),
+                    "end_time": now + timedelta(hours=18),
+                    "status": "Active",
+                    "created_at": now - timedelta(hours=6)
+                },
+                {
+                    "id": "d0000003-0000-0000-0000-000000000003",
+                    "disruption_type": "Weather",
+                    "title": "Heavy Outer Fog & Channel Speed Restriction",
+                    "description": "Harbor pilotage restricted navigation speed to 6 knots in outer fairway due to dense advection fog.",
+                    "affected_resource_type": "port",
+                    "affected_resource_id": None,
+                    "severity": "Medium",
+                    "start_time": now - timedelta(hours=2),
+                    "end_time": now + timedelta(hours=8),
+                    "status": "Active",
+                    "created_at": now - timedelta(hours=2)
+                }
+            ]
+            for d in disruptions_seed:
+                super(SyncedTable, self.disruptions).__setitem__(d["id"], d)
 
 
 # Global singleton repository instance

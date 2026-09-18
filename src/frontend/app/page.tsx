@@ -127,7 +127,7 @@ export default function DashboardPage() {
   }
 
   // Congestion score semantic metadata (strict 5-tier dynamic system)
-  const congestionMeta = getCongestionMeta(congestion?.score ?? 45);
+  const congestionMeta = getCongestionMeta(congestion?.score ?? 0);
 
   // Resource utilization semantic helpers
   const waitingCount = metrics?.waiting_at_anchorage ?? 0;
@@ -148,7 +148,7 @@ export default function DashboardPage() {
     <AppShell
       title="Port Operations Dashboard"
       description="Monitor real-time congestion, identify operational bottlenecks, and take targeted action."
-      congestionScore={congestion?.score || 45}
+      congestionScore={congestion?.score ?? 0}
       congestionLevel={congestionMeta.label}
       onRefresh={loadData}
       isRefreshing={refreshing}
@@ -435,7 +435,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-3">
             <span className="text-2xl font-bold font-mono text-[#2F7D5B] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
-              +${(latestRun?.metrics?.demurrage_saved_usd ?? 142500).toLocaleString()}
+              +${(latestRun?.metrics?.demurrage_saved_usd ?? 0).toLocaleString()}
             </span>
             <span className="text-xs text-[#5C6B68]">avoided demurrage penalty</span>
           </div>
@@ -461,7 +461,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-3">
             <span className="text-2xl font-bold font-mono text-[#2F7D8C] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
-              {(latestRun?.metrics?.co2_abated_mt ?? 38.4).toFixed(1)} MT CO₂
+              {(latestRun?.metrics?.co2_abated_mt ?? 0).toFixed(1)} MT CO₂
             </span>
             <span className="text-xs text-[#5C6B68]">emissions abated</span>
           </div>

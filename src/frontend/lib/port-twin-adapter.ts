@@ -411,18 +411,18 @@ export function adaptDisruptions(
       if (targetCrane) {
         coords = targetCrane.coordinates;
         affectedCode = targetCrane.crane_code;
-      } else {
-        coords = [103.7622, 1.2518];
-        affectedCode = "CR-10";
+      } else if (adaptedCranes.length > 0) {
+        coords = adaptedCranes[0].coordinates;
+        affectedCode = adaptedCranes[0].crane_code;
       }
     } else if (d.affected_resource_type === "berth") {
       const targetBerth = adaptedBerths.find((b) => b.id === d.affected_resource_id || b.berth_code === d.affected_resource_id);
       if (targetBerth) {
         coords = targetBerth.coordinates;
         affectedCode = targetBerth.berth_code;
-      } else {
-        coords = [103.7615, 1.2520];
-        affectedCode = "B-05";
+      } else if (adaptedBerths.length > 0) {
+        coords = adaptedBerths[0].coordinates;
+        affectedCode = adaptedBerths[0].berth_code;
       }
     } else {
       // Port / Fairway
@@ -443,10 +443,10 @@ export function adaptDisruptions(
       description: d.description || "",
       estimated_risk_usd: d.severity === "Critical" ? 55000 : d.severity === "High" ? 35000 : 15000,
       estimated_delay_hours: d.severity === "Critical" ? 6.5 : d.severity === "High" ? 4.0 : 2.0,
-      at_risk_vessel_names: ["ONE Apus", "Ever Given"],
-      affected_vessel_names: ["ONE Apus"],
-      affected_berth_codes: [affectedCode.startsWith("B-") ? affectedCode : "B-05"],
-      affected_crane_codes: [affectedCode.startsWith("CR-") ? affectedCode : "CR-10"],
+      at_risk_vessel_names: [],
+      affected_vessel_names: [],
+      affected_berth_codes: [affectedCode.startsWith("B-") ? affectedCode : ""],
+      affected_crane_codes: [affectedCode.startsWith("CR-") ? affectedCode : ""],
       recommended_action: "Execute dynamic schedule hot-swap via NaviOps CP-SAT Optimizer.",
       coordinates: coords,
     };

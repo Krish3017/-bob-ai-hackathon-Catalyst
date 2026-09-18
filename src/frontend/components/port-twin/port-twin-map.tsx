@@ -34,6 +34,7 @@ import {
   PortTwinScenarioPreset,
   NavigationRoute,
 } from "@/data/port-twin-data";
+import { adaptPortTwinData } from "@/lib/port-twin-adapter";
 
 import { PortTwinOverlay, LayerVisibility } from "./port-twin-overlay";
 import { PortTwinPopup, InspectedObject } from "./port-twin-popup";
@@ -114,6 +115,7 @@ export function PortTwinMap() {
   // Dynamic asset state (supports scenario failure injection)
   const [cranes, setCranes] = useState<PortTwinCrane[]>(PORT_CRANES);
   const [berths, setBerths] = useState<PortTwinBerth[]>(PORT_BERTHS);
+  const [yards, setYards] = useState<PortTwinYard[]>(PORT_YARDS);
 
   // Phase 3: Operational Intelligence & Scenario Simulation State
   const [intelligenceTab, setIntelligenceTab] = useState<IntelligenceTab>("disruptions");
@@ -129,6 +131,62 @@ export function PortTwinMap() {
     demurrage_usd: number;
     congestion_points: number;
   } | null>(null);
+
+  // Live Database Connectivity & Polling State
+  const [dataConnectionStatus, setDataConnectionStatus] = useState<"connected" | "connecting" | "offline">("connecting");
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  // Reference to selectedObject for live in-place telemetry synchronization
+  const selectedObjectRef = useRef(selectedObject);
+  useEffect(() => {
+    selectedObjectRef.current = selectedObject;
+  }, [selectedObject]);
+
+  // Database Telemetry Polling Fetcher
+  const fetchLiveTwinData = useCallback(async () => {
+    try {
+      const res = await api.getPortTwinData();
+      if (res && res.vessels && res.berths) {
+        const adapted = adaptPortTwinData(res);
+        setBerths(adapted.berths);
+        setCranes(adapted.cranes);
+        setYards(adapted.yards);
+        setVessels(adapted.vessels);
+        if (adapted.disruptions.length > 0) {
+          setDisruptions(adapted.disruptions);
+        }
+
+        // Live update detail inspector panel if an asset is currently selected
+        const currentSel = selectedObjectRef.current;
+        if (currentSel) {
+          if (currentSel.type === "vessel") {
+            const updated = adapted.vessels.find((v) => v.id === currentSel.data.id || v.vessel_code === currentSel.data.vessel_code);
+            if (updated) setSelectedObject({ type: "vessel", data: updated });
+          } else if (currentSel.type === "berth") {
+            const updated = adapted.berths.find((b) => b.id === currentSel.data.id || b.berth_code === currentSel.data.berth_code);
+            if (updated) setSelectedObject({ type: "berth", data: updated });
+          } else if (currentSel.type === "crane") {
+            const updated = adapted.cranes.find((c) => c.id === currentSel.data.id || c.crane_code === currentSel.data.crane_code);
+            if (updated) setSelectedObject({ type: "crane", data: updated });
+          }
+        }
+
+        setDataConnectionStatus("connected");
+        const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        setLastSyncTime(timeStr);
+      }
+    } catch (err) {
+      console.warn("Port Twin 2D backend telemetry unreachable, maintaining baseline:", err);
+      setDataConnectionStatus("offline");
+    }
+  }, []);
+
+  // Poll database every 15 seconds
+  useEffect(() => {
+    fetchLiveTwinData();
+    const interval = setInterval(fetchLiveTwinData, 15000);
+    return () => clearInterval(interval);
+  }, [fetchLiveTwinData]);
 
   const [layers, setLayers] = useState<LayerVisibility>({
     vessels: true,
@@ -155,7 +213,9 @@ export function PortTwinMap() {
     operationalCranes: cranes.filter((c) => c.status !== "Failed" && c.status !== "Maintenance").length,
     totalCranes: cranes.length,
     avgYardUtilization: Math.round(
-      PORT_YARDS.reduce((acc, y) => acc + y.utilization_pct, 0) / PORT_YARDS.length
+      yards.length > 0
+        ? yards.reduce((acc, y) => acc + y.utilization_pct, 0) / yards.length
+        : PORT_YARDS.reduce((acc, y) => acc + y.utilization_pct, 0) / PORT_YARDS.length
     ),
   };
 
@@ -871,7 +931,7 @@ export function PortTwinMap() {
               <span class="tracking-tight">${vessel.vessel_name}</span>
               ${isApproaching && vessel.speed_knots ? `<span class="text-[9px] text-cyan-300 font-mono">${vessel.speed_knots}kts</span>` : ""}
               ${isWorking && vessel.moves_completed && vessel.moves_total ? `<span class="text-[9px] text-emerald-400 font-mono">${Math.round((vessel.moves_completed / vessel.moves_total) * 100)}%</span>` : ""}
-              ${isDelayed ? `<span class="text-[9px] text-rose-400 font-mono">+5.5h</span>` : ""}
+              ${isDelayed && vessel.delay_hours ? `<span class="text-[9px] text-rose-400 font-mono">+${vessel.delay_hours}h</span>` : ""}
               ${isCritical ? '<span class="text-[9px] text-amber-400 font-mono">P1</span>' : ""}
             </div>
           </div>
@@ -1045,9 +1105,8 @@ export function PortTwinMap() {
   const handleClearScenario = useCallback(() => {
     setActiveScenario(null);
     setSimulationDeltas(null);
-    setCranes(PORT_CRANES);
-    setBerths(PORT_BERTHS);
-  }, []);
+    fetchLiveTwinData();
+  }, [fetchLiveTwinData]);
 
   // ---------------------------------------------------------------------------
   // CAMERA CONTROLS
@@ -1077,7 +1136,7 @@ export function PortTwinMap() {
 
   // Reset simulation vessels to original coordinates & clear scenarios
   const handleResetSimulation = () => {
-    setVessels(PORT_VESSELS);
+    fetchLiveTwinData();
     setSimSeconds(14 * 3600 + 30 * 60);
     handleClearScenario();
   };

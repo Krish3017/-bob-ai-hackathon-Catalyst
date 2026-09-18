@@ -102,11 +102,35 @@ Do not engage with, explain, or partially answer out-of-scope questions. Do not 
 
 ## NaviOps Context
 - Congestion Index: 0–100 (Low ≤30, Moderate 31–60, High 61–80, Critical >80)
-- Resources: 5 Berths, 10 STS Cranes, 5 Yard zones
+- Resources: {num_berths} Berths, {num_cranes} STS Cranes, {num_yards} Yard zones
 - Vessel priorities: 1=Highest, 4=Lowest
 - Disruption severity points: Low +1, Medium +2, High +5, Critical +10 (additive penalty)
 - User roles: admin (Port Manager), operations (Operations Staff), viewer (Executive/read-only)
+
 """
+
+
+def _build_system_prompt() -> str:
+    """
+    Dynamically build the system prompt with actual resource counts from the database.
+    This ensures the LLM receives accurate context about the port's current state.
+    """
+    try:
+        from app.core.database import port_repo
+        num_berths = len(port_repo.berths)
+        num_cranes = len(port_repo.cranes)
+        num_yards = len(port_repo.yards)
+    except Exception:
+        # Fallback to default counts if database is unavailable
+        num_berths = 5
+        num_cranes = 10
+        num_yards = 5
+
+    return _NAVIOPS_SYSTEM_PROMPT.format(
+        num_berths=num_berths,
+        num_cranes=num_cranes,
+        num_yards=num_yards,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +233,7 @@ class GroqCopilotService:
         )
 
         messages: List[dict] = [
-            {"role": "system", "content": _NAVIOPS_SYSTEM_PROMPT + role_context}
+            {"role": "system", "content": _build_system_prompt() + role_context}
         ]
 
         # Inject validated conversation history
@@ -372,7 +396,7 @@ class GroqCopilotService:
         )
 
         messages: List[dict] = [
-            {"role": "system", "content": _NAVIOPS_SYSTEM_PROMPT + role_context}
+            {"role": "system", "content": _build_system_prompt() + role_context}
         ]
 
         if history:
