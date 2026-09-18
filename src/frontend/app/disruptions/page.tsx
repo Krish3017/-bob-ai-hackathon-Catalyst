@@ -96,6 +96,7 @@ export default function DisruptionsPage() {
     try {
       await api.deleteDisruption(id);
       toast.success("Disruption deleted", "Incident record removed.");
+      setDisruptions((prev) => prev.filter((d) => d.id !== id));
       loadAll();
     } catch (err: any) {
       toast.error(

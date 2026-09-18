@@ -183,6 +183,7 @@ export default function UsersPage() {
       if (selectedUser?.id === targetUser.id) {
         setSelectedUser(null);
       }
+      setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
       await fetchUsersData();
     } catch (err: any) {
       toast.error("Delete Failed", err.message || "Could not delete user account.");

@@ -61,6 +61,7 @@ export default function VesselsPage() {
     try {
       await api.deleteVessel(id);
       toast.success("Vessel deleted", `${name} was removed from the fleet queue.`);
+      setVessels((prev) => prev.filter((v) => v.id !== id));
       loadVessels();
     } catch (err: any) {
       toast.error("Unable to delete vessel", err.message || "Action restricted.");

@@ -102,6 +102,7 @@ export default function OperationsPage() {
     try {
       await api.deleteVessel(id);
       toast.success("Vessel removed", `${name} removed from operations queue.`);
+      setVessels((prev) => prev.filter((v) => v.id !== id));
       loadAll();
     } catch (err: any) {
       toast.error("Unable to remove vessel", err.message || "Action restricted.");
