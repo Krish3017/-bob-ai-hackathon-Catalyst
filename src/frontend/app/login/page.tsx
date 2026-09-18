@@ -2,56 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  Anchor, ShieldCheck, UserCheck, Eye, Lock, Mail, User,
-  Building, AlertCircle, ArrowRight, CheckCircle2
-} from "lucide-react";
+import { Anchor, Lock, Mail, AlertCircle, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/design-system/button";
-import { Badge } from "@/design-system/badge";
-import { api, setAuthToken } from "@/lib/api";
-import { UserRole } from "@/types";
+import { api, setAuthToken, clearAuthToken } from "@/lib/api";
+import { getRoleDashboard } from "@/lib/roles";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"login" | "signup">("login");
 
-  const [loginEmail, setLoginEmail] = useState("admin@naviops.port");
-  const [loginPassword, setLoginPassword] = useState("admin123");
-
-  const [signupName, setSignupName] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [signupDept, setSignupDept] = useState("Quayside Operations");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("naviops_token");
-      if (token) router.replace("/");
+      const role = localStorage.getItem("naviops_role");
+      if (token) {
+        router.replace(getRoleDashboard(role));
+      } else {
+        // Ensure clean state upon navigating to login or post-logout
+        setLoginEmail("");
+        setLoginPassword("");
+        setError(null);
+      }
     }
   }, [router]);
-
-  const handleDemoFill = async (email: string, role: UserRole) => {
-    setLoginEmail(email);
-    setLoginPassword("admin123");
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await api.login(email, "admin123", role);
-      setAuthToken(res.token);
-      localStorage.setItem("naviops_token", res.token);
-      localStorage.setItem("naviops_role", res.user.role);
-      localStorage.setItem("naviops_user", JSON.stringify(res.user));
-      window.location.href = "/";
-    } catch (err: any) {
-      setError(err.message || "Failed to log in with demo account");
-      setIsLoading(false);
-    }
-  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +43,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      // Auto-normalize @naviops.com to @naviops.port for demo accounts
+      // Auto-normalize @naviops.com to @naviops.port for backwards compatibility
       const normalizedEmail = cleanEmail.toLowerCase().endsWith("@naviops.com")
         ? cleanEmail.slice(0, -4) + ".port"
         : cleanEmail;
@@ -74,392 +53,177 @@ export default function LoginPage() {
       localStorage.setItem("naviops_token", res.token);
       localStorage.setItem("naviops_role", res.user.role);
       localStorage.setItem("naviops_user", JSON.stringify(res.user));
-      window.location.href = "/";
+
+      // Automatic role-based dashboard redirection
+      const destination = getRoleDashboard(res.user.role);
+      window.location.href = destination;
     } catch (err: any) {
       const msg = err.message || "Invalid email or password.";
       setError(
         msg.includes("Invalid email or password")
-          ? "Invalid email or password. Use demo account (e.g. admin@naviops.port / admin123) or click a 1-Click Demo Persona below."
+          ? "Invalid email or password. Please check your credentials or contact your administrator."
           : msg
       );
       setIsLoading(false);
     }
   };
 
-  const handleSignupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signupName || !signupEmail || !signupPassword) {
-      setError("Please fill out all required fields.");
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await api.signup({
-        full_name: signupName,
-        email: signupEmail,
-        password: signupPassword,
-        department: signupDept,
-      });
-      setAuthToken(res.token);
-      localStorage.setItem("naviops_token", res.token);
-      localStorage.setItem("naviops_role", res.user.role);
-      localStorage.setItem("naviops_user", JSON.stringify(res.user));
-      setSuccessMsg("Account successfully created as Viewer (Read-Only). Redirecting to port overview...");
-      setTimeout(() => { window.location.href = "/"; }, 1000);
-    } catch (err: any) {
-      setError(err.message || "Signup failed. Please try again.");
-      setIsLoading(false);
-    }
-  };
-
   const inputClass =
-    "w-full rounded-lg border border-[#D5D9D3] bg-white px-3 py-2 pl-9 text-sm text-[#102A27] placeholder:text-[#899491] focus:border-[#004741] focus:outline-none focus:ring-1 focus:ring-[#004741] transition-colors";
+    "w-full rounded-xl border border-[#D5D9D3] bg-[#F7F8F6] px-4 py-3 pl-11 text-sm text-[#102A27] placeholder:text-[#899491] focus:bg-white focus:border-[#004741] focus:outline-none focus:ring-2 focus:ring-[#004741]/20 transition-all";
 
   return (
-    /*
-     * Full-screen background layer.
-     * Background image: /port-bg.jpg (place the port terminal photo in public/port-bg.jpg)
-     * Falls back to a matching gradient derived from the image's cyan-sky + teal-water palette
-     * when the image is not yet present.
-     *
-     * Overlay strategy (light, brand-aligned):
-     *   - A thin sand/white gradient left-to-right preserves the image on the left
-     *     while lightening the right panel area to keep the card readable
-     *   - opacity kept low so the port image remains clearly visible
-     */
-    <div
-      className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center"
-      style={{
-        backgroundImage:
-          "url('/port-bg.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "left center",
-        backgroundRepeat: "no-repeat",
-        /* Matching fallback gradient for the provided image's color palette:
-           top: cyan sky (#A8DDE8 → #C9EDF3), bottom: deep teal water (#2F7D8C → #004741) */
-        backgroundColor: "#7BCBD8",
-      }}
-    >
-      {/*
-       * Soft light overlay — Sand+White on the right, nearly transparent on the left.
-       * Keeps the cranes and containers visible while making the card area bright.
-       * NOT dark mode: uses sand #F0EDE4 and white, NOT dark grays.
-       */}
+    <div className="relative min-h-screen w-full overflow-hidden flex flex-col justify-between bg-[#071715]">
+      {/* ── Ambient Maritime Depth Background & Subtle Grid (No Posters) ── */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "linear-gradient(105deg, rgba(240,237,228,0.18) 0%, rgba(240,237,228,0.30) 40%, rgba(250,250,248,0.55) 65%, rgba(250,250,248,0.72) 100%)",
+            "radial-gradient(ellipse 90% 60% at 50% -10%, rgba(0, 114, 104, 0.35) 0%, rgba(10, 31, 29, 0.9) 55%, #05100F 100%)",
         }}
       />
-
-      {/*
-       * Second subtle overlay — a very faint Cyprus tint over the lower portion
-       * so the water/harbor area ties back to the brand color.
-       */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
         style={{
-          background:
-            "linear-gradient(to bottom, transparent 50%, rgba(0,71,65,0.06) 100%)",
+          backgroundImage:
+            "radial-gradient(rgba(255, 255, 255, 0.9) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
         }}
       />
 
-      {/* ── Main Content ── */}
-      <div className="relative z-10 w-full flex flex-col items-center px-4 py-10 sm:py-14">
+      {/* ── Subtle Ambient Orb Highlights ── */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#004741]/20 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#2F7D8C]/15 blur-3xl pointer-events-none" />
 
-        {/* ── Brand Header ── */}
-        <div className="text-center mb-6">
-          <div
-            className="inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white mb-4"
-            style={{
-              background: "#004741",
-              boxShadow: "0 4px 20px rgba(0,71,65,0.35)",
-            }}
-          >
-            <Anchor className="h-7 w-7" />
+      {/* ── Main Container (Generous & Spacious) ── */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-16">
+        
+        {/* ── Brand Emblem & Title ── */}
+        <div className="text-center mb-8 max-w-lg">
+          <div className="inline-flex items-center justify-center mb-5">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-2xl transition-transform hover:scale-105 duration-300"
+              style={{
+                background: "linear-gradient(135deg, #005F58 0%, #003B36 100%)",
+                boxShadow: "0 8px 32px rgba(0, 71, 65, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}
+            >
+              <Anchor className="h-8 w-8 text-[#54D2C3]" />
+            </div>
           </div>
 
-          <h1
-            className="text-2xl sm:text-3xl font-bold tracking-tight"
-            style={{ color: "#102A27", textShadow: "0 1px 3px rgba(255,255,255,0.7)" }}
-          >
-            NaviOps Port Operations
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+            NaviOps <span className="font-light text-[#7BCBD8]">Port Operations</span>
           </h1>
-          <p
-            className="text-xs sm:text-sm font-medium mt-1.5"
-            style={{ color: "#2E4845", textShadow: "0 1px 2px rgba(255,255,255,0.6)" }}
-          >
-            Port Congestion Prediction &amp; Resource Schedule Optimizer
+          <p className="text-xs sm:text-sm text-[#A0B5B2] font-medium mt-2 max-w-md mx-auto leading-relaxed">
+            Autonomous Berth Schedule Optimizer &amp; Real-Time Port Digital Twin
           </p>
         </div>
 
-        {/* ── Authentication Card ── */}
+        {/* ── Spacious Executive Authentication Card ── */}
         <div
-          className="w-full max-w-md"
+          className="w-full max-w-[460px] rounded-3xl bg-white shadow-[0_24px_64px_-12px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.12)] overflow-hidden"
           style={{
-            background: "rgba(255, 255, 255, 0.93)",
-            border: "1px solid rgba(227,229,224,0.9)",
-            borderRadius: "18px",
-            boxShadow:
-              "0 8px 32px rgba(0,71,65,0.12), 0 2px 8px rgba(0,71,65,0.08), 0 0 0 1px rgba(197,221,217,0.3)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
           }}
         >
-          <div className="px-6 pt-6 pb-2 sm:px-8 sm:pt-7">
-
-            {/* ── Tab Selector ── */}
-            <div className="flex border-b border-[#E3E5E0] mb-6">
-              <button
-                type="button"
-                onClick={() => { setTab("login"); setError(null); }}
-                className={`flex-1 pb-3 text-sm font-semibold text-center border-b-2 transition-colors ${
-                  tab === "login"
-                    ? "border-[#004741] text-[#004741]"
-                    : "border-transparent text-[#899491] hover:text-[#5C6B68]"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTab("signup"); setError(null); }}
-                className={`flex-1 pb-3 text-sm font-semibold text-center border-b-2 transition-colors ${
-                  tab === "signup"
-                    ? "border-[#004741] text-[#004741]"
-                    : "border-transparent text-[#899491] hover:text-[#5C6B68]"
-                }`}
-              >
-                Create Account
-              </button>
+          <div className="p-8 sm:p-10">
+            {/* Form Title */}
+            <div className="mb-7">
+              <h2 className="text-xl font-bold text-[#102A27] tracking-tight">
+                Personnel Sign In
+              </h2>
+              <p className="text-xs text-[#5C6B68] mt-1.5 leading-relaxed">
+                Enter your authorized credentials. Role permissions and dashboard views will configure automatically.
+              </p>
             </div>
 
-            {/* ── Feedback Messages ── */}
+            {/* Error Feedback */}
             {error && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#F2C4C3] bg-[#FCE9E8] p-3 text-xs text-[#B94A48]">
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#F2C4C3] bg-[#FCE9E8] p-3.5 text-xs text-[#B94A48] animate-in fade-in">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-            {successMsg && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#A8D9BC] bg-[#E5F2EA] p-3 text-xs text-[#2F7D5B]">
-                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{successMsg}</span>
+                <span className="leading-relaxed">{error}</span>
               </div>
             )}
 
-            {/* ════════════════════════════════ */}
-            {/*          SIGN IN FORM           */}
-            {/* ════════════════════════════════ */}
-            {tab === "login" && (
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                      placeholder="user@naviops.port"
-                      className={inputClass}
-                    />
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
+            {/* Form */}
+            <form onSubmit={handleLoginSubmit} className="space-y-5" autoComplete="off">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#354845] mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    autoComplete="off"
+                    placeholder="name@naviops.port"
+                    className={inputClass}
+                  />
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[#899491]" />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                      placeholder="••••••••"
-                      className={inputClass}
-                    />
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#354845] mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••••••"
+                    className={`${inputClass} pr-11`}
+                  />
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-[#899491]" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3.5 text-[#899491] hover:text-[#102A27] transition-colors focus:outline-none"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
+              </div>
 
+              <div className="pt-2">
                 <Button
                   type="submit"
                   variant="primary"
-                  className="w-full justify-center mt-2"
+                  className="w-full justify-center py-3.5 text-sm font-semibold rounded-xl bg-[#004741] text-white hover:bg-[#003833] shadow-lg shadow-[#004741]/25 hover:shadow-xl hover:shadow-[#004741]/35 transition-all"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Signing in..." : "Sign In to NaviOps"}
+                  {isLoading ? "Authenticating Session..." : "Sign In to Terminal"}
                 </Button>
+              </div>
+            </form>
 
-                {/* ── Demo Personas ── */}
-                <div className="pt-4 border-t border-[#F0EDE4]">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#899491] mb-2">
-                    1-Click Demo Personas:
-                  </p>
-                  <div className="space-y-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill("admin@naviops.port", "admin")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs rounded-xl border border-[#E3E5E0] bg-[#F7F6F2] hover:bg-[#E1EFEC] hover:border-[#C5DDD9] transition-all text-left"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E1EFEC]">
-                          <ShieldCheck className="h-4 w-4 text-[#004741]" />
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[#102A27]">Port Manager (Admin)</span>
-                          <span className="block text-[10px] text-[#899491]">admin@naviops.port · admin123</span>
-                        </div>
-                      </div>
-                      <Badge variant="status" status="Available" size="sm">Full Access</Badge>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill("ops@naviops.port", "operations")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs rounded-xl border border-[#E3E5E0] bg-[#F7F6F2] hover:bg-[#E1EFEC] hover:border-[#C5DDD9] transition-all text-left"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E1F0F2]">
-                          <UserCheck className="h-4 w-4 text-[#2F7D8C]" />
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[#102A27]">Operations Staff</span>
-                          <span className="block text-[10px] text-[#899491]">ops@naviops.port · admin123</span>
-                        </div>
-                      </div>
-                      <Badge variant="status" status="Normal" size="sm">Ops & Solver</Badge>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill("executive@naviops.port", "viewer")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs rounded-xl border border-[#E3E5E0] bg-[#F7F6F2] hover:bg-[#FFF4DE] hover:border-[#F0D49A] transition-all text-left"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFF4DE]">
-                          <Eye className="h-4 w-4 text-[#C58A2B]" />
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[#102A27]">Executive / Viewer</span>
-                          <span className="block text-[10px] text-[#899491]">executive@naviops.port · admin123</span>
-                        </div>
-                      </div>
-                      <Badge variant="status" status="Near Capacity" size="sm">Read-Only</Badge>
-                    </button>
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {/* ════════════════════════════════ */}
-            {/*        CREATE ACCOUNT FORM      */}
-            {/* ════════════════════════════════ */}
-            {tab === "signup" && (
-              <form onSubmit={handleSignupSubmit} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">Full Name</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                      required
-                      placeholder="Capt. Sarah Jenkins"
-                      className={inputClass}
-                    />
-                    <User className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">Work Email</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      value={signupEmail}
-                      onChange={(e) => setSignupEmail(e.target.value)}
-                      required
-                      placeholder="s.jenkins@terminal.port"
-                      className={inputClass}
-                    />
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">Department</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={signupDept}
-                      onChange={(e) => setSignupDept(e.target.value)}
-                      placeholder="Quayside Operations / Harbor Control"
-                      className={inputClass}
-                    />
-                    <Building className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#102A27] mb-1">Password</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={signupPassword}
-                      onChange={(e) => setSignupPassword(e.target.value)}
-                      required
-                      placeholder="••••••••"
-                      className={inputClass}
-                    />
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-[#899491]" />
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[#C5DDD9] bg-[#E1EFEC] p-2.5 text-[11px] text-[#004741]">
-                  <span className="font-semibold">Security Role Policy:</span> All new signups receive the{" "}
-                  <strong className="font-bold">Viewer (Read-Only)</strong> role. An administrator can elevate your access to Operations or Admin from the Users Directory.
-                </div>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  className="w-full justify-center mt-2"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Creating Account..." : "Create Account & Sign In"}
-                </Button>
-              </form>
-            )}
-
-            {/* ── Footer Link ── */}
-            <div className="mt-5 pb-5 sm:pb-6 text-center">
-              <Link
-                href="/"
-                className="text-xs text-[#5C6B68] hover:text-[#004741] font-medium inline-flex items-center gap-1 transition-colors"
-              >
-                Continue directly to Dashboard <ArrowRight className="h-3 w-3" />
-              </Link>
+            {/* Security Assurance Notice */}
+            <div className="mt-7 pt-5 border-t border-[#EEF0EB] flex items-center justify-center gap-2 text-[11px] text-[#7A8885]">
+              <ShieldCheck className="h-4 w-4 text-[#004741]" />
+              <span>TLS 1.3 Encrypted &bull; Access Monitored &amp; Logged</span>
             </div>
-
           </div>
         </div>
-
-        {/* ── Footer Tag ── */}
-        <p
-          className="mt-6 text-[11px] font-medium"
-          style={{ color: "rgba(16,42,39,0.55)", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}
-        >
-          NaviOps © {new Date().getFullYear()} · Maritime Port Operations Platform
-        </p>
       </div>
+
+      {/* ── Minimalist Clean Footer ── */}
+      <footer className="relative z-10 py-5 text-center text-xs text-[#7A918E]">
+        <p>
+          NaviOps Port Authority Operating System &bull; Version 2.4.0
+        </p>
+      </footer>
     </div>
   );
 }

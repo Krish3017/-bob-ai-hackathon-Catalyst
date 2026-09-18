@@ -182,6 +182,7 @@ def copilot_chat(
     return CopilotChatResponse(
         reply=reply,
         session_id=conversation_id or payload.session_id,
+        conversation_id=conversation_id,
         model=settings.GROQ_MODEL,
         role_context=current_user.role,
         tools_used=tools_used if tools_used else None,

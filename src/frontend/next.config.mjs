@@ -5,6 +5,20 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
   },
+  async redirects() {
+    return [
+      {
+        source: "/signup",
+        destination: "/login",
+        permanent: true,
+      },
+      {
+        source: "/register",
+        destination: "/login",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -89,15 +89,51 @@ export function Berths({
               <meshStandardMaterial
                 color={fillColor}
                 transparent
-                opacity={isSelected ? 0.9 : isHovered ? 0.75 : 0.6}
+                opacity={isSelected ? 0.95 : isHovered ? 0.8 : 0.65}
                 roughness={0.5}
               />
             </mesh>
 
-            {/* Berth Edge Boundary Line */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.385, 0]}>
-              <ringGeometry args={[0, 0, 4]} />
-            </mesh>
+            {/* Physical Quay Coping Beam Strip along water boundary */}
+            {(() => {
+              const dx = p2[0] - p1[0];
+              const dz = p2[2] - p1[2];
+              const segLength = Math.hypot(dx, dz);
+              const segAngle = Math.atan2(dx, dz);
+              const midX = (p1[0] + p2[0]) / 2;
+              const midZ = (p1[2] + p2[2]) / 2;
+              return (
+                <group>
+                  {/* Heavy Concrete Quay Edge Cap */}
+                  <mesh
+                    position={[midX, 0.41, midZ]}
+                    rotation={[0, segAngle, 0]}
+                    castShadow
+                    receiveShadow
+                  >
+                    <boxGeometry args={[0.55, 0.12, segLength]} />
+                    <meshStandardMaterial color="#475569" roughness={0.7} metalness={0.2} />
+                  </mesh>
+                  {/* High-visibility Quay Safety Curb Line */}
+                  <mesh
+                    position={[midX, 0.43, midZ]}
+                    rotation={[0, segAngle, 0]}
+                  >
+                    <boxGeometry args={[0.15, 0.04, segLength * 0.98]} />
+                    <meshStandardMaterial color={isSelected ? "#3b82f6" : "#f59e0b"} roughness={0.5} />
+                  </mesh>
+                  {/* Berth Boundary Pylons at ends */}
+                  <mesh position={[p1[0], 0.5, p1[2]]}>
+                    <cylinderGeometry args={[0.2, 0.25, 0.6, 6]} />
+                    <meshStandardMaterial color="#334155" metalness={0.5} />
+                  </mesh>
+                  <mesh position={[p2[0], 0.5, p2[2]]}>
+                    <cylinderGeometry args={[0.2, 0.25, 0.6, 6]} />
+                    <meshStandardMaterial color="#334155" metalness={0.5} />
+                  </mesh>
+                </group>
+              );
+            })()}
 
             {/* 2. Mooring Bollards along quay rim */}
             {[0.2, 0.5, 0.8].map((t, bIdx) => {

@@ -136,20 +136,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [show]
   );
 
+  const contextValue = React.useMemo(
+    () => ({
+      toasts,
+      show,
+      success,
+      error,
+      warning,
+      info,
+      loading,
+      dismiss,
+      clear,
+    }),
+    [toasts, show, success, error, warning, info, loading, dismiss, clear]
+  );
+
   return (
-    <ToastContext.Provider
-      value={{
-        toasts,
-        show,
-        success,
-        error,
-        warning,
-        info,
-        loading,
-        dismiss,
-        clear,
-      }}
-    >
+    <ToastContext.Provider value={contextValue}>
       {children}
       <ToastViewport toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>

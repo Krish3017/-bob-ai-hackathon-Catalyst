@@ -21,7 +21,6 @@ class UserResponse(UserBase):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, description="User password")
-    role: Optional[str] = None
 
 
 class SignupRequest(BaseModel):
@@ -361,6 +360,7 @@ class CopilotChatRequest(BaseModel):
 class CopilotChatResponse(BaseModel):
     reply: str
     session_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     model: str
     role_context: str
     tools_used: Optional[List[str]] = Field(default=None, description="Internal tool names that were called during this request")

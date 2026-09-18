@@ -1,17 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import * as THREE from "three";
 import { Html } from "@react-three/drei";
-import { PortTwinVessel, PORT_BERTHS } from "@/data/port-twin-data";
-import { geoToWorld, headingToRadians, getBerthedVesselPosition, QUAY_ANGLE } from "./coords";
-
-interface VesselsProps {
-  vessels: PortTwinVessel[];
-  selectedVesselId?: string | null;
-  onSelectVessel: (vessel: PortTwinVessel) => void;
-  visible?: boolean;
-}
+import { PortTwinVessel, PortTwinBerth } from "@/data/port-twin-data";
+import { resolveVesselLayout, ResolvedVesselDisplay } from "@/lib/vessel-layout";
 
 // Shipping line container color tokens
 const CONTAINER_PALETTE = [
@@ -25,6 +18,7 @@ const CONTAINER_PALETTE = [
 
 interface VesselsProps {
   vessels: PortTwinVessel[];
+  berths?: PortTwinBerth[];
   selectedVesselId?: string | null;
   onSelectVessel: (vessel: PortTwinVessel) => void;
   onHoverVessel?: (vessel: PortTwinVessel | null, x?: number, y?: number) => void;
@@ -33,45 +27,18 @@ interface VesselsProps {
 
 // Single Recognizable Container Ship Model
 function ContainerShip({
-  vessel,
+  display,
   isSelected,
   onSelect,
   onHover,
 }: {
-  vessel: PortTwinVessel;
+  display: ResolvedVesselDisplay;
   isSelected: boolean;
   onSelect: () => void;
   onHover?: (vessel: PortTwinVessel | null, x?: number, y?: number) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-
-  // Compute position: if berthed or working, place realistically alongside berth in water!
-  let posX = 0;
-  let posY = 0.08;
-  let posZ = 0;
-  let rotationY = 0;
-
-  if (vessel.assigned_berth_code && (vessel.status === "Berthed" || vessel.status === "Working")) {
-    const berth = PORT_BERTHS.find((b) => b.berth_code === vessel.assigned_berth_code);
-    if (berth) {
-      const berthedPos = getBerthedVesselPosition(berth.coordinates);
-      posX = berthedPos[0];
-      posY = berthedPos[1];
-      posZ = berthedPos[2];
-      // Align ship parallel with quay wall
-      rotationY = QUAY_ANGLE + Math.PI / 2;
-    } else {
-      const [wx, , wz] = geoToWorld(vessel.coordinates, 0.08);
-      posX = wx;
-      posZ = wz;
-      rotationY = headingToRadians(vessel.heading_degrees);
-    }
-  } else {
-    const [wx, , wz] = geoToWorld(vessel.coordinates, 0.08);
-    posX = wx;
-    posZ = wz;
-    rotationY = headingToRadians(vessel.heading_degrees);
-  }
+  const { vessel, worldPosition, rotationY, labelOffsetY, labelOffsetX, isSecondaryBerthed } = display;
 
   // Dimension scaling based on Length Overall (LOA)
   const length = Math.max(11, Math.min(22, vessel.loa_meters * 0.05));
@@ -93,9 +60,11 @@ function ContainerShip({
     ? "#f59e0b"
     : "#7c3aed";
 
+  const hasHighPriority = isSelected || hovered || isDelayed;
+
   return (
     <group
-      position={[posX, posY, posZ]}
+      position={worldPosition}
       rotation={[0, rotationY, 0]}
       onClick={(e) => {
         e.stopPropagation();
@@ -219,23 +188,23 @@ function ContainerShip({
         </mesh>
       </group>
 
-      {/* ================= 4. COMPACT PROFESSIONAL GIS VESSEL LABEL ================= */}
+      {/* ================= 4. COLLISION-AWARE GIS VESSEL LABEL ================= */}
       <Html
-        position={[0, hullHeight + 3.2, 0]}
+        position={[labelOffsetX, hullHeight + labelOffsetY, 0]}
         center
         distanceFactor={85}
-        zIndexRange={[10, 0]}
+        zIndexRange={hasHighPriority ? [100, 50] : [20, 0]}
         style={{ pointerEvents: "none" }}
       >
         <div
           className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[9px] font-bold shadow-sm transition-all select-none whitespace-nowrap ${
             isSelected
-              ? "bg-slate-900 border border-blue-500 text-white shadow-md"
+              ? "bg-slate-900 border border-blue-400 text-white shadow-lg ring-2 ring-blue-500/40 z-30"
               : hovered
-              ? "bg-white border border-blue-500 text-blue-900 shadow"
+              ? "bg-white border border-blue-500 text-blue-950 shadow-md ring-1 ring-blue-400/50 z-30"
               : isDelayed
-              ? "bg-white border border-rose-400 text-rose-800"
-              : "bg-white/95 border border-slate-300 text-slate-800"
+              ? "bg-white border border-rose-500 text-rose-900 shadow-sm z-20"
+              : "bg-white/95 border border-slate-300 text-slate-800 shadow-sm z-10"
           }`}
         >
           <span
@@ -243,6 +212,16 @@ function ContainerShip({
             style={{ backgroundColor: statusColor }}
           />
           <span>{vessel.vessel_name}</span>
+          {isSecondaryBerthed && vessel.assigned_berth_code && (
+            <span className="text-[7.5px] font-mono px-1 py-0.2 bg-amber-100 text-amber-900 rounded font-semibold">
+              Q:{vessel.assigned_berth_code}
+            </span>
+          )}
+          {(isSelected || hovered) && vessel.assigned_berth_code && !isSecondaryBerthed && (
+            <span className="text-[7.5px] font-mono px-1 py-0.2 bg-blue-100 text-blue-800 rounded font-semibold">
+              {vessel.assigned_berth_code}
+            </span>
+          )}
         </div>
       </Html>
     </group>
@@ -251,21 +230,27 @@ function ContainerShip({
 
 export function Vessels({
   vessels,
+  berths = [],
   selectedVesselId,
   onSelectVessel,
   onHoverVessel,
   visible = true,
 }: VesselsProps) {
+  // Compute deterministic, collision-free layout for all vessels
+  const resolvedDisplays = useMemo(() => {
+    return resolveVesselLayout(vessels, berths);
+  }, [vessels, berths]);
+
   if (!visible) return null;
 
   return (
     <group>
-      {vessels.map((vessel) => (
+      {resolvedDisplays.map((disp) => (
         <ContainerShip
-          key={vessel.id}
-          vessel={vessel}
-          isSelected={selectedVesselId === vessel.id}
-          onSelect={() => onSelectVessel(vessel)}
+          key={disp.vessel.id}
+          display={disp}
+          isSelected={selectedVesselId === disp.vessel.id}
+          onSelect={() => onSelectVessel(disp.vessel)}
           onHover={onHoverVessel}
         />
       ))}

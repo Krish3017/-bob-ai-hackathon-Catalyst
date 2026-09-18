@@ -16,57 +16,15 @@ from app.core.auth import get_current_user, require_role, create_access_token, h
 router = APIRouter(prefix="/api/auth", tags=["Authentication & RBAC"])
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-def signup(req: SignupRequest):
+@router.post("/signup", status_code=status.HTTP_403_FORBIDDEN)
+def signup():
     """
-    Register new port personnel.
-    Per security policy: All newly registered accounts are assigned the 'viewer' role by default.
-    A Port Manager / Admin can elevate permissions to 'operations' or 'admin' from the Users Directory.
+    Public registration is strictly disabled.
+    All user accounts must be provisioned by an authorized administrator from Admin -> Users.
     """
-    email_clean = req.email.strip().lower()
-
-    if not req.password or len(req.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters long."
-        )
-
-    # Check for existing email
-    for u in port_repo.users.values():
-        if u.get("email", "").lower() == email_clean:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"An account with email '{email_clean}' is already registered."
-            )
-
-    new_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
-
-    user_data = {
-        "id": new_id,
-        "email": email_clean,
-        "full_name": req.full_name.strip(),
-        "role": "viewer",  # Strictly start as viewer as required
-        "department": req.department.strip() if req.department else "Port Logistics",
-        "password_hash": hash_password(req.password),
-        "created_at": now
-    }
-
-    # Store in repository (which syncs to Supabase PostgreSQL)
-    port_repo.users[new_id] = user_data
-
-    # Generate JWT token
-    token = create_access_token({
-        "sub": new_id,
-        "email": email_clean,
-        "role": "viewer",
-        "name": user_data["full_name"],
-        "department": user_data["department"]
-    })
-
-    return AuthResponse(
-        token=token,
-        user=UserResponse(**user_data)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Public registration is disabled. All user accounts must be provisioned by a Port Administrator."
     )
 
 
@@ -74,11 +32,12 @@ def signup(req: SignupRequest):
 def login(req: LoginRequest):
     """
     Authenticate user and return signed JWT token.
-    Pre-configured mock accounts:
+    Pre-configured accounts:
     - Port Manager: admin@naviops.port / admin123
     - Operations Staff: ops@naviops.port / admin123
     - Executive Viewer: executive@naviops.port / admin123
     """
+    port_repo.refresh_users_from_db()
     email_clean = req.email.strip().lower()
     user_match = None
 
@@ -145,7 +104,9 @@ def list_users(current_user: UserResponse = Depends(require_role(["admin"]))):
     """
     List all registered users (Port Manager / Admin only).
     Enables managing roles and auditing system access.
+    Always synchronizes with persistent database store.
     """
+    port_repo.refresh_users_from_db()
     users = list(port_repo.users.values())
     users.sort(key=lambda u: str(u.get("created_at", "")), reverse=True)
     return [UserResponse(**u) for u in users]
@@ -242,4 +203,43 @@ def update_user_role(
     port_repo.users[user_id] = user  # Triggers live sync to Supabase
 
     return UserResponse(**user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
+def delete_user(
+    user_id: str,
+    current_user: UserResponse = Depends(require_role(["admin"]))
+):
+    """
+    Delete a user account (Port Manager / Admin only).
+    Safeguards:
+    - Admin cannot delete their own active account.
+    - Cannot delete the last remaining administrator account.
+    """
+    if user_id not in port_repo.users:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    # Guard 1: Prevent admin from deleting their own active account
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own active administrator account."
+        )
+
+    target_user = port_repo.users[user_id]
+
+    # Guard 2: Prevent deleting the only remaining administrator account
+    if target_user.get("role") == "admin":
+        admin_count = sum(1 for u in port_repo.users.values() if u.get("role") == "admin")
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the only remaining administrator account."
+            )
+
+    del port_repo.users[user_id]
+    return {"message": "User deleted successfully", "id": user_id}
 

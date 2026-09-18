@@ -27,6 +27,7 @@ import { PortTwinTooltip, HoveredAsset } from "../port-twin/port-twin-tooltip";
 import { PortTwinIntelligence, IntelligenceTab } from "../port-twin/port-twin-intelligence";
 import { geoToWorld } from "./coords";
 import { api } from "@/lib/api";
+import { adaptPortTwinData } from "@/lib/port-twin-adapter";
 
 function interpolateRoutePosition(
   waypoints: [number, number][],
@@ -126,6 +127,65 @@ export function PortTwin3DMap() {
     demurrage_usd: number;
     congestion_points: number;
   } | null>(null);
+
+  // Live Database Connectivity & Polling State
+  const [dataConnectionStatus, setDataConnectionStatus] = useState<"connected" | "connecting" | "offline">("connecting");
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  // Reference to selectedObject for live in-place telemetry synchronization
+  const selectedObjectRef = useRef(selectedObject);
+  useEffect(() => {
+    selectedObjectRef.current = selectedObject;
+  }, [selectedObject]);
+
+  // Database Telemetry Polling Fetcher
+  const fetchLiveTwinData = useCallback(async () => {
+    try {
+      const res = await api.getPortTwinData();
+      if (res && res.vessels && res.berths) {
+        const adapted = adaptPortTwinData(res);
+        setBerths(adapted.berths);
+        setCranes(adapted.cranes);
+        setYards(adapted.yards);
+        setVessels(adapted.vessels);
+        if (adapted.disruptions.length > 0) {
+          setDisruptions(adapted.disruptions);
+        }
+
+        // Live update detail inspector panel if an asset is currently selected
+        const currentSel = selectedObjectRef.current;
+        if (currentSel) {
+          if (currentSel.type === "vessel") {
+            const updated = adapted.vessels.find((v) => v.id === currentSel.data.id || v.vessel_code === currentSel.data.vessel_code);
+            if (updated) setSelectedObject({ type: "vessel", data: updated });
+          } else if (currentSel.type === "berth") {
+            const updated = adapted.berths.find((b) => b.id === currentSel.data.id || b.berth_code === currentSel.data.berth_code);
+            if (updated) setSelectedObject({ type: "berth", data: updated });
+          } else if (currentSel.type === "crane") {
+            const updated = adapted.cranes.find((c) => c.id === currentSel.data.id || c.crane_code === currentSel.data.crane_code);
+            if (updated) setSelectedObject({ type: "crane", data: updated });
+          } else if (currentSel.type === "yard") {
+            const updated = adapted.yards.find((y) => y.id === currentSel.data.id || y.yard_code === currentSel.data.yard_code);
+            if (updated) setSelectedObject({ type: "yard", data: updated });
+          }
+        }
+
+        setDataConnectionStatus("connected");
+        const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        setLastSyncTime(timeStr);
+      }
+    } catch (err) {
+      console.warn("Port Twin backend telemetry unreachable, maintaining baseline:", err);
+      setDataConnectionStatus("offline");
+    }
+  }, []);
+
+  // Poll database every 15 seconds
+  useEffect(() => {
+    fetchLiveTwinData();
+    const interval = setInterval(fetchLiveTwinData, 15000);
+    return () => clearInterval(interval);
+  }, [fetchLiveTwinData]);
 
   // Layer Visibility
   const [layers, setLayers] = useState<LayerVisibility3D>({
@@ -347,6 +407,8 @@ export function PortTwin3DMap() {
           is25DPitch={is25DPitch}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
+          connectionStatus={dataConnectionStatus}
+          lastSyncTime={lastSyncTime}
           stats={stats}
         />
 

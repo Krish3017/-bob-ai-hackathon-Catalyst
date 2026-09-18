@@ -309,6 +309,7 @@ export const PortScene = forwardRef<PortSceneControlsHandle, PortSceneProps>(
 
           <Vessels
             vessels={vessels}
+            berths={berths}
             selectedVesselId={selectedVesselId}
             onSelectVessel={onSelectVessel}
             onHoverVessel={(v, x, y) =>

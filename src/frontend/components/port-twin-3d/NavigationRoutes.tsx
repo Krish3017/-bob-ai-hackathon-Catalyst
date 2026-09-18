@@ -77,18 +77,6 @@ export function NavigationRoutes({
                 <sphereGeometry args={[0.12, 8, 8]} />
                 <meshBasicMaterial color={buoy.color} />
               </mesh>
-
-              <Html
-                position={[0, 1.4, 0]}
-                center
-                distanceFactor={75}
-                zIndexRange={[10, 0]}
-                style={{ pointerEvents: "none" }}
-              >
-                <div className="rounded bg-white/95 px-1 py-0.2 text-[8px] font-mono font-bold text-slate-700 border border-slate-300 shadow-sm">
-                  {buoy.id}
-                </div>
-              </Html>
             </group>
           ))}
         </group>

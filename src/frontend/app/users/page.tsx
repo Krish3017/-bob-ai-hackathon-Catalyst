@@ -17,6 +17,7 @@ import {
   Check,
   X,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/design-system/card";
@@ -32,6 +33,8 @@ import { useConfirm } from "@/components/design-system/confirm-dialog";
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [currentRole, setCurrentRole] = useState<UserRole>("admin");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<{ [userId: string]: boolean }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -68,9 +71,48 @@ export default function UsersPage() {
     if (typeof window !== "undefined") {
       const savedRole = (localStorage.getItem("naviops_role") as UserRole) || "admin";
       setCurrentRole(savedRole);
+      const userJson = localStorage.getItem("naviops_user");
+      if (userJson) {
+        try {
+          const parsed = JSON.parse(userJson);
+          if (parsed?.id) setCurrentUserId(parsed.id);
+        } catch (e) {}
+      }
     }
     fetchUsersData();
   }, []);
+
+  // ── Delete User Handler ──
+  const handleDeleteUser = async (targetUser: User) => {
+    if (targetUser.id === currentUserId) {
+      toast.error("Action Prohibited", "You cannot delete your own active administrator account.");
+      return;
+    }
+
+    const isConfirmed = await confirm({
+      title: `Delete User: ${targetUser.full_name}`,
+      description: `Are you sure you want to permanently delete ${targetUser.full_name} (${targetUser.email})? They will immediately lose access to NaviOps. This action cannot be undone.`,
+      confirmText: "Delete Account",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+
+    if (!isConfirmed) return;
+
+    setIsDeleting((prev) => ({ ...prev, [targetUser.id]: true }));
+    try {
+      await api.deleteUser(targetUser.id);
+      toast.success("User Deleted", `${targetUser.full_name} has been removed from the system.`);
+      if (selectedUser?.id === targetUser.id) {
+        setSelectedUser(null);
+      }
+      await fetchUsersData();
+    } catch (err: any) {
+      toast.error("Delete Failed", err.message || "Could not delete user account.");
+    } finally {
+      setIsDeleting((prev) => ({ ...prev, [targetUser.id]: false }));
+    }
+  };
 
   // ── Create User Handler ──
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -102,11 +144,11 @@ export default function UsersPage() {
         role: createRole,
       });
 
-      // Instantly add to frontend table
-      setUsers((prev) => [newUser, ...prev]);
+      // Re-fetch users from database to ensure persistence
+      await fetchUsersData();
 
       toast.success(
-        "Personnel Registered",
+        "User Created",
         `${newUser.full_name} was successfully created with role ${newUser.role.toUpperCase()}.`
       );
 
@@ -263,7 +305,7 @@ export default function UsersPage() {
                   Personnel Directory & Privilege Matrix
                 </CardTitle>
                 <p className="text-xs text-[#5C6B68] mt-0.5">
-                  Promote new viewer signups to Operations or Administrator roles.
+                  Manage port personnel accounts, assign operational roles, and review privileges.
                 </p>
               </div>
               {/* In-page User Registration Button */}
@@ -277,7 +319,7 @@ export default function UsersPage() {
                 }}
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Sign Up New User
+                Create User
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -406,15 +448,30 @@ export default function UsersPage() {
                             </TableCell>
 
                             <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSelectedUser(user)}
-                                className="h-7 text-xs gap-1.5 text-[#004741] border-[#C5DDD9] hover:bg-[#E1EFEC]"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                View Profile
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedUser(user)}
+                                  className="h-7 text-xs gap-1.5 text-[#004741] border-[#C5DDD9] hover:bg-[#E1EFEC]"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  View Profile
+                                </Button>
+                                {currentRole === "admin" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={isDeleting[user.id] || user.id === currentUserId}
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                                    title={user.id === currentUserId ? "Cannot delete your own account" : "Delete user"}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span className="sr-only sm:not-sr-only">Delete</span>
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -451,7 +508,7 @@ export default function UsersPage() {
                       <Eye className="h-3.5 w-3.5" /> Viewer / Executive
                     </span>
                     <p className="text-[#5C6B68] text-[11px]">
-                      Read-only access. Default role assigned upon public signup. Can view port KPIs, congestion indices, Gantt charts, and disruption logs without modification rights.
+                      Read-only access. Can view port KPIs, congestion indices, Gantt charts, and disruption logs without modification rights.
                     </p>
                   </div>
                 </div>
@@ -462,7 +519,7 @@ export default function UsersPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
-      {/*              MODAL: REGISTER NEW USER / PERSONNEL               */}
+      {/*              MODAL: CREATE NEW USER                             */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <Modal
         isOpen={isCreateModalOpen}
@@ -472,8 +529,8 @@ export default function UsersPage() {
             setCreateError(null);
           }
         }}
-        title="Register New Port Personnel"
-        description="Create a new personnel account with immediate role privileges. Stays within your admin session."
+        title="Create New User"
+        description="Create a user account with assigned operational role. Persisted directly in the database."
         maxWidth="md"
       >
         <form onSubmit={handleCreateUser} className="space-y-4 pt-1">
@@ -762,7 +819,21 @@ export default function UsersPage() {
               </p>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-3 border-t border-[#E3E5E0]">
+              {currentRole === "admin" && selectedUser.id !== currentUserId ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isDeleting[selectedUser.id]}
+                  onClick={() => handleDeleteUser(selectedUser)}
+                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete User Account
+                </Button>
+              ) : (
+                <div />
+              )}
               <Button
                 variant="outline"
                 size="sm"

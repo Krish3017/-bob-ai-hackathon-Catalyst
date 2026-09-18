@@ -13,6 +13,7 @@ import {
   SimulateOptimizationRequest,
   SimulationResponse,
   SentinelAlertResponse,
+  PortTwinApiResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -208,6 +209,9 @@ export const api = {
       body: JSON.stringify({ run_id: runId }),
     }),
 
+  // Live Port Digital Twin Telemetry
+  getPortTwinData: () => fetchWithAuth<PortTwinApiResponse>("/api/port-twin"),
+
   // Copilot — Chat
   copilotChat: (
     message: string,
@@ -218,6 +222,7 @@ export const api = {
     fetchWithAuth<{
       reply: string;
       session_id?: string;
+      conversation_id?: string;
       model: string;
       role_context: string;
       tools_used?: string[] | null;
@@ -278,15 +283,10 @@ export const api = {
     fetchWithAuth<void>(`/api/copilot/conversations/${id}`, { method: "DELETE" }),
 
   // Auth & Personnel Directory
-  login: (email: string, password?: string, role?: string) =>
+  login: (email: string, password?: string) =>
     fetchWithAuth<{ token: string; user: User }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password: password || "admin123", role }),
-    }),
-  signup: (data: { email: string; password: string; full_name: string; department?: string }) =>
-    fetchWithAuth<{ token: string; user: User }>("/api/auth/signup", {
-      method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ email: email.trim(), password: password || "admin123" }),
     }),
   getMe: () => fetchWithAuth<User>("/api/auth/me"),
   getUsers: () => fetchWithAuth<User[]>("/api/auth/users"),
@@ -305,6 +305,10 @@ export const api = {
     fetchWithAuth<User>(`/api/auth/users/${userId}/role`, {
       method: "PUT",
       body: JSON.stringify({ role }),
+    }),
+  deleteUser: (userId: string) =>
+    fetchWithAuth<{ message: string; id: string }>(`/api/auth/users/${userId}`, {
+      method: "DELETE",
     }),
 };
 

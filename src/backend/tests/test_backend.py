@@ -137,32 +137,37 @@ def test_password_hashing_and_verification():
 
 
 def test_signup_and_login_flow():
-    # 1. Signup new personnel
+    # 1. Public signup must be disabled (403 Forbidden)
     signup_res = client.post("/api/auth/signup", json={
         "email": "engineer.test@naviops.port",
         "password": "EnginePassword123!",
         "full_name": "Chief Engineer John",
         "department": "Quayside Engineering"
     })
-    assert signup_res.status_code == 201
-    signup_data = signup_res.json()
-    assert "token" in signup_data
-    assert signup_data["user"]["role"] == "viewer"
-    user_id = signup_data["user"]["id"]
+    assert signup_res.status_code == 403
 
-    # Verify password is not plaintext in memory
-    raw_user = port_repo.users[user_id]
-    assert raw_user["password_hash"] != "EnginePassword123!"
+    # 2. Admin creates personnel account
+    admin_token = create_access_token({"sub": "11111111-1111-1111-1111-111111111111", "email": "admin@naviops.port", "role": "admin"})
+    create_res = client.post("/api/auth/users", headers={"Authorization": f"Bearer {admin_token}"}, json={
+        "email": "engineer.test@naviops.port",
+        "password": "EnginePassword123!",
+        "full_name": "Chief Engineer John",
+        "department": "Quayside Engineering",
+        "role": "operations"
+    })
+    # If already created in prior run, it's 400 or 201
+    assert create_res.status_code in (201, 400)
 
-    # 2. Login with correct password
+    # 3. Login with correct password
     login_res = client.post("/api/auth/login", json={
         "email": "engineer.test@naviops.port",
         "password": "EnginePassword123!"
     })
     assert login_res.status_code == 200
     assert "token" in login_res.json()
+    assert login_res.json()["user"]["role"] == "operations"
 
-    # 3. Login with incorrect password
+    # 4. Login with incorrect password
     bad_login = client.post("/api/auth/login", json={
         "email": "engineer.test@naviops.port",
         "password": "WrongPassword!"
@@ -307,7 +312,8 @@ def test_admin_create_user():
     assert res_forbidden.status_code == 403
 
     # Admin successfully creates user
-    test_email = "test.officer@naviops.port"
+    import uuid
+    test_email = f"officer.{uuid.uuid4().hex[:8]}@naviops.port"
     res = client.post(
         "/api/auth/users",
         json={
@@ -376,5 +382,45 @@ def test_disruption_sentinel_endpoint():
     assert "active_alerts" in data
     assert "total_risk_exposure_usd" in data
     assert "recommended_action" in data
+
+
+def test_port_twin_endpoint():
+    # Test GET /api/port-twin returning database-backed operational dataset
+    res = client.get("/api/port-twin")
+    assert res.status_code == 200
+    data = res.json()
+    assert "vessels" in data
+    assert "berths" in data
+    assert "cranes" in data
+    assert "yards" in data
+    assert "disruptions" in data
+    assert "server_time" in data
+
+    # Verify berths have enriched vessel and assigned crane data
+    assert len(data["berths"]) >= 5
+    for b in data["berths"]:
+        assert "berth_code" in b
+        assert "status" in b
+
+    # Verify cranes have status and berth associations
+    assert len(data["cranes"]) >= 10
+    for c in data["cranes"]:
+        assert "crane_code" in c
+        assert "status" in c
+        assert c["status"] in ["Available", "Busy", "Maintenance", "Failed"]
+
+    # Verify vessels have operational status and length
+    assert len(data["vessels"]) >= 10
+    for v in data["vessels"]:
+        assert "vessel_code" in v
+        assert "vessel_name" in v
+        assert "status" in v
+
+    # Verify yards have utilization percentage
+    assert len(data["yards"]) >= 5
+    for y in data["yards"]:
+        assert "yard_code" in y
+        assert "utilization_percentage" in y
+
 
 
