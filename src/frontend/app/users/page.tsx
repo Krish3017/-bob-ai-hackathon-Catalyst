@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   UserCheck,
   Eye,
+  EyeOff,
   CheckCircle2,
   Search,
   UserPlus,
@@ -18,6 +19,9 @@ import {
   X,
   AlertCircle,
   Trash2,
+  Copy,
+  Key,
+  RefreshCw,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/design-system/card";
@@ -41,6 +45,19 @@ export default function UsersPage() {
   const [updateStatus, setUpdateStatus] = useState<{ [userId: string]: string }>({});
   const toast = useToast();
   const confirm = useConfirm();
+
+  // ── Password storage & visibility state ──
+  const [userPasswords, setUserPasswords] = useState<Record<string, string>>({
+    "admin@naviops.port": "admin123",
+    "ops@naviops.port": "admin123",
+    "executive@naviops.port": "admin123",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
+  const [passwordUpdateError, setPasswordUpdateError] = useState<string | null>(null);
 
   // ── Modal states ──
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -78,9 +95,69 @@ export default function UsersPage() {
           if (parsed?.id) setCurrentUserId(parsed.id);
         } catch (e) {}
       }
+
+      // Load persisted user passwords
+      const savedPasswords = localStorage.getItem("naviops_saved_passwords");
+      if (savedPasswords) {
+        try {
+          const parsedPass = JSON.parse(savedPasswords);
+          setUserPasswords((prev) => ({ ...prev, ...parsedPass }));
+        } catch (e) {}
+      }
     }
     fetchUsersData();
   }, []);
+
+  const saveUserPassword = (userId: string, email: string, pass: string) => {
+    setUserPasswords((prev) => {
+      const updated = {
+        ...prev,
+        [userId]: pass,
+        [email.toLowerCase()]: pass,
+      };
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("naviops_saved_passwords", JSON.stringify(updated));
+        }
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const getEffectivePassword = (user: User) => {
+    return userPasswords[user.id] || userPasswords[user.email.toLowerCase()] || "admin123";
+  };
+
+  const copyToClipboard = (text: string, fieldId: string, label: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      toast.success("Copied to Clipboard", `${label} copied.`);
+      setTimeout(() => setCopiedField(null), 2000);
+    }
+  };
+
+  const handleResetPassword = async (userId: string, email: string) => {
+    const cleanPass = newPasswordInput.trim();
+    if (!cleanPass || cleanPass.length < 6) {
+      setPasswordUpdateError("Password must be at least 6 characters long.");
+      return;
+    }
+    setIsPasswordUpdating(true);
+    setPasswordUpdateError(null);
+    try {
+      await api.updateUserPassword(userId, cleanPass);
+      saveUserPassword(userId, email, cleanPass);
+      toast.success("Password Updated", "User password has been updated and saved.");
+      setIsResettingPassword(false);
+      setNewPasswordInput("");
+    } catch (err: any) {
+      setPasswordUpdateError(err.message || "Failed to update password.");
+      toast.error("Update Failed", err.message || "Could not update password.");
+    } finally {
+      setIsPasswordUpdating(false);
+    }
+  };
 
   // ── Delete User Handler ──
   const handleDeleteUser = async (targetUser: User) => {
@@ -144,12 +221,15 @@ export default function UsersPage() {
         role: createRole,
       });
 
+      // Save credentials for immediate visibility in profile
+      saveUserPassword(newUser.id, cleanEmail, cleanPassword);
+
       // Re-fetch users from database to ensure persistence
       await fetchUsersData();
 
       toast.success(
         "User Created",
-        `${newUser.full_name} was successfully created with role ${newUser.role.toUpperCase()}.`
+        `${newUser.full_name} was successfully created with role ${newUser.role.toUpperCase()}. Password has been saved.`
       );
 
       // Reset & close modal
@@ -660,9 +740,15 @@ export default function UsersPage() {
       {selectedUser && (
         <Modal
           isOpen={!!selectedUser}
-          onClose={() => setSelectedUser(null)}
-          title="Personnel Profile & Clearances"
-          description="Detailed operational profile, security privileges, and live role assignment."
+          onClose={() => {
+            setSelectedUser(null);
+            setShowPassword(false);
+            setIsResettingPassword(false);
+            setNewPasswordInput("");
+            setPasswordUpdateError(null);
+          }}
+          title="Personnel Profile & Operational Credentials"
+          description="View sign-in credentials, update access passwords, and review live operational privileges."
           maxWidth="md"
         >
           <div className="space-y-4 pt-1">
@@ -695,7 +781,7 @@ export default function UsersPage() {
                     </Badge>
                   )}
                 </div>
-                <div className="text-xs text-[#5C6B68] mt-0.5">{selectedUser.email}</div>
+                <div className="text-xs text-[#5C6B68] mt-0.5 font-medium">{selectedUser.email}</div>
                 <div className="text-[11px] text-[#899491] flex items-center gap-1 mt-0.5">
                   <Building className="h-3 w-3" />
                   {selectedUser.department || "Port Operations"}
@@ -703,7 +789,188 @@ export default function UsersPage() {
               </div>
             </div>
 
-            {/* Account Details */}
+            {/* ── Sign-In & Access Credentials Card ── */}
+            <div className="rounded-xl border border-[#A2D9D1] bg-[#F0FAF7] p-3.5 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between pb-2 border-b border-[#D0EDE7]">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#004741] text-white">
+                    <Key className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#102A27]">
+                      Sign-In & Account Credentials
+                    </h4>
+                    <p className="text-[10px] text-[#5C6B68]">
+                      Provide these credentials to personnel for authentication.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const pass = getEffectivePassword(selectedUser);
+                    const portalUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/signin` : "/auth/signin";
+                    const credText = `NaviOps Port Orchestration Portal Credentials\n• User Name: ${selectedUser.full_name}\n• Email / Login ID: ${selectedUser.email}\n• Password: ${pass}\n• Role: ${selectedUser.role.toUpperCase()}\n• Department: ${selectedUser.department || "Port Operations"}\n• Sign-In URL: ${portalUrl}`;
+                    copyToClipboard(credText, "all", "All credentials");
+                  }}
+                  className="h-7 px-2.5 text-[11px] font-semibold gap-1 text-[#004741] border-[#A2D9D1] bg-white hover:bg-[#E1EFEC]"
+                >
+                  {copiedField === "all" ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" /> Copied All!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" /> Copy All Credentials
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {/* Full Name / Username */}
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#E3E5E0]">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-[#899491] block">
+                      User Name / Full Name
+                    </span>
+                    <span className="font-semibold text-[#102A27] text-xs truncate block">
+                      {selectedUser.full_name}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedUser.full_name, "name", "Full Name")}
+                    className="p-1.5 text-[#5C6B68] hover:text-[#004741] hover:bg-[#F0FAF7] rounded transition-colors"
+                    title="Copy Name"
+                  >
+                    {copiedField === "name" ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Email Address / Login ID */}
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#E3E5E0]">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-[#899491] block">
+                      Email Address (Login ID)
+                    </span>
+                    <span className="font-mono text-xs font-semibold text-[#102A27] truncate block">
+                      {selectedUser.email}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedUser.email, "email", "Email Address")}
+                    className="p-1.5 text-[#5C6B68] hover:text-[#004741] hover:bg-[#F0FAF7] rounded transition-colors"
+                    title="Copy Email"
+                  >
+                    {copiedField === "email" ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Password */}
+                <div className="bg-white px-3 py-2 rounded-lg border border-[#E3E5E0]">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] uppercase font-bold text-[#899491] block">
+                        Password
+                      </span>
+                      <span className="font-mono text-xs font-bold text-[#102A27] tracking-wider block">
+                        {showPassword ? getEffectivePassword(selectedUser) : "••••••••••••"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="p-1.5 text-[#5C6B68] hover:text-[#004741] hover:bg-[#F0FAF7] rounded transition-colors"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(getEffectivePassword(selectedUser), "password", "Password")}
+                        className="p-1.5 text-[#5C6B68] hover:text-[#004741] hover:bg-[#F0FAF7] rounded transition-colors"
+                        title="Copy Password"
+                      >
+                        {copiedField === "password" ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inline Reset / Set Password toggle */}
+                <div className="pt-1">
+                  {!isResettingPassword ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsResettingPassword(true);
+                        setNewPasswordInput("");
+                        setPasswordUpdateError(null);
+                      }}
+                      className="text-[11px] font-semibold text-[#004741] hover:underline flex items-center gap-1"
+                    >
+                      <Key className="h-3 w-3" /> Reset / Set New Password
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-white rounded-lg border border-[#D5D9D3] space-y-2 mt-1">
+                      <div className="text-xs font-semibold text-[#102A27]">Set New Password</div>
+                      {passwordUpdateError && (
+                        <div className="text-[11px] text-rose-600 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> {passwordUpdateError}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Enter new password (min 6 chars)"
+                          value={newPasswordInput}
+                          onChange={(e) => setNewPasswordInput(e.target.value)}
+                          className="flex-1 rounded border border-[#D5D9D3] bg-white px-2.5 py-1.5 text-xs text-[#102A27] focus:border-[#004741] focus:outline-none"
+                        />
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={isPasswordUpdating || newPasswordInput.trim().length < 6}
+                          onClick={() => handleResetPassword(selectedUser.id, selectedUser.email)}
+                          className="h-7 text-xs bg-[#004741] text-white hover:bg-[#003833]"
+                        >
+                          {isPasswordUpdating ? "Saving..." : "Save Password"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsResettingPassword(false);
+                            setPasswordUpdateError(null);
+                          }}
+                          className="h-7 text-xs text-[#5C6B68]"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Account Metadata Details */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2.5 bg-white rounded-lg border border-[#E3E5E0]">
                 <span className="text-[10px] uppercase font-bold text-[#899491] block">

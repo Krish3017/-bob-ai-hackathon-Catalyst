@@ -306,6 +306,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ role }),
     }),
+  updateUserPassword: (userId: string, password: string) =>
+    fetchWithAuth<User>(`/api/auth/users/${userId}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    }),
   deleteUser: (userId: string) =>
     fetchWithAuth<{ message: string; id: string }>(`/api/auth/users/${userId}`, {
       method: "DELETE",

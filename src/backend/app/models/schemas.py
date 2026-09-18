@@ -34,6 +34,10 @@ class UserRoleUpdate(BaseModel):
     role: str = Field(..., description="Role must be 'admin', 'operations', or 'viewer'")
 
 
+class AdminUpdatePasswordRequest(BaseModel):
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+
+
 class AdminCreateUserRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
