@@ -234,10 +234,10 @@ class TestToolArguments:
 
     def test_waiting_vessels_limit_clamped_high(self):
         user = _make_user()
-        # limit=999 should be clamped to max=20
+        # limit=999 should be clamped to max=100
         result = execute_tool("get_waiting_vessels", {"limit": 999}, user)
         assert result["status"] == "ok"
-        assert result["result_count"] <= 20
+        assert result["result_count"] <= 100
 
     def test_waiting_vessels_limit_clamped_low(self):
         user = _make_user()

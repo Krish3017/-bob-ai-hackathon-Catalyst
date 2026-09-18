@@ -45,8 +45,8 @@ def get_dashboard_summary(current_user: UserResponse = Depends(get_current_user)
     failed_cranes = len([c for c in cranes if c.get("status") == "Failed"])
     maint_cranes = len([c for c in cranes if c.get("status") == "Maintenance"])
 
-    total_yard_cap = sum(y.get("total_capacity", 0) for y in yards)
-    total_yard_occ = sum(y.get("occupied_capacity", 0) for y in yards)
+    total_yard_cap = sum(y.get("total_capacity") or 0 for y in yards)
+    total_yard_occ = sum(y.get("occupied_capacity") or 0 for y in yards)
     overall_yard_util = round((total_yard_occ / max(1, total_yard_cap)) * 100.0, 1)
 
     active_disruptions = [DisruptionResponse(**d) for d in disruptions if d.get("status") == "Active"]
@@ -58,7 +58,7 @@ def get_dashboard_summary(current_user: UserResponse = Depends(get_current_user)
         "berth_utilization_rate": round((occupied_berths / max(1, total_berths)) * 100.0, 1),
         "crane_utilization_rate": round((busy_cranes / max(1, total_cranes - failed_cranes - maint_cranes)) * 100.0, 1) if (total_cranes - failed_cranes - maint_cranes) > 0 else 0.0,
         "yard_utilization_rate": overall_yard_util,
-        "estimated_total_delay_hours": round(sum(v.get("expected_waiting_time", 0.0) for v in waiting_vessels), 1),
+        "estimated_total_delay_hours": round(sum((v.get("expected_waiting_time") or 0.0) for v in waiting_vessels), 1),
         "vessels_inbound_24h": len([v for v in active_vessels if v.get("status") in ["Scheduled", "Delayed"]])
     }
 

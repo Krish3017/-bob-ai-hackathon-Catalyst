@@ -6,8 +6,10 @@ import urllib.parse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+import socket
+
 def sanitize_database_url(url: str) -> str:
-    """Safely urlencode password if it contains special characters like @"""
+    """Safely urlencode password and ensure IPv4 pooler compatibility for Supabase."""
     if not url:
         return ""
     url = url.strip()
@@ -16,6 +18,23 @@ def sanitize_database_url(url: str) -> str:
     if match:
         prefix, user, password, host_db, rest = match.groups()
         encoded_pwd = urllib.parse.quote(urllib.parse.unquote(password))
+
+        # Check for db.<ref>.supabase.co direct domain which lacks IPv4 A-records on newer Supabase infra
+        supabase_match = re.search(r'db\.([a-z0-9]+)\.supabase\.co(?::\d+)?', host_db)
+        if supabase_match:
+            ref = supabase_match.group(1)
+            host_only = f"db.{ref}.supabase.co"
+            needs_pooler = False
+            try:
+                socket.getaddrinfo(host_only, 5432)
+            except Exception:
+                needs_pooler = True
+
+            if needs_pooler:
+                pooler_user = f"postgres.{ref}" if not user.startswith(f"postgres.{ref}") else user
+                pooler_host_db = f"aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+                return f"{prefix}{pooler_user}:{encoded_pwd}@{pooler_host_db}{rest}"
+
         return f"{prefix}{user}:{encoded_pwd}@{host_db}{rest}"
     return url
 

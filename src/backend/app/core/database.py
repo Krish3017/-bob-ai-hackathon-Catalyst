@@ -230,6 +230,25 @@ class PortRepository:
 
     def refresh_users_from_db(self):
         """Ensure in-memory users cache is completely synchronized with persistent store."""
+        if self.is_connected or settings.clean_database_url:
+            try:
+                conn = self.get_connection()
+                if conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT * FROM users")
+                        db_users = [clean_row(r) for r in cur.fetchall()]
+                        if db_users:
+                            current_ids = {u["id"] for u in db_users}
+                            for u in db_users:
+                                super(SyncedTable, self.users).__setitem__(u["id"], u)
+                                persist_user_sqlite(u)
+                            for uid in list(self.users.keys()):
+                                if uid not in current_ids:
+                                    super(SyncedTable, self.users).__delitem__(uid)
+                            return
+            except Exception as e:
+                logger.warning(f"Failed to refresh users from PostgreSQL: {e}")
+
         sqlite_users = _load_users_sqlite()
         if sqlite_users:
             current_ids = {u["id"] for u in sqlite_users}

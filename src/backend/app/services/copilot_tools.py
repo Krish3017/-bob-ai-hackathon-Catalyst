@@ -89,9 +89,9 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                 "properties": {
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of vessels to return (1–20). Default is 10.",
+                        "description": "Maximum number of vessels to return (1–100). Default is 100.",
                         "minimum": 1,
-                        "maximum": 20,
+                        "maximum": 100,
                     }
                 },
                 "required": [],
@@ -121,9 +121,9 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of vessels to return (1–20). Default is 14.",
+                        "description": "Maximum number of vessels to return (1–100). Default is 100.",
                         "minimum": 1,
-                        "maximum": 20,
+                        "maximum": 100,
                     },
                 },
                 "required": [],
@@ -310,10 +310,10 @@ def _dispatch(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     if tool_name == "get_congestion_status":
         return _get_congestion_status()
     if tool_name == "get_waiting_vessels":
-        limit = _safe_int(args.get("limit"), default=10, min_val=1, max_val=20)
+        limit = _safe_int(args.get("limit"), default=100, min_val=1, max_val=100)
         return _get_waiting_vessels(limit=limit)
     if tool_name == "get_vessels":
-        limit = _safe_int(args.get("limit"), default=14, min_val=1, max_val=20)
+        limit = _safe_int(args.get("limit"), default=100, min_val=1, max_val=100)
         status_filter = _safe_str(args.get("status_filter"))
         return _get_vessels(status_filter=status_filter, limit=limit)
     if tool_name == "get_berths":
@@ -431,7 +431,7 @@ def _get_congestion_status() -> Dict[str, Any]:
     }
 
 
-def _get_waiting_vessels(limit: int = 10) -> Dict[str, Any]:
+def _get_waiting_vessels(limit: int = 100) -> Dict[str, Any]:
     all_vessels = list(port_repo.vessels.values())
     waiting = [v for v in all_vessels if v.get("status") == "Waiting"]
     waiting.sort(key=lambda v: float(v.get("expected_waiting_time", 0.0)), reverse=True)
@@ -468,7 +468,7 @@ _VALID_VESSEL_STATUSES = {
 }
 
 
-def _get_vessels(status_filter: Optional[str] = None, limit: int = 14) -> Dict[str, Any]:
+def _get_vessels(status_filter: Optional[str] = None, limit: int = 100) -> Dict[str, Any]:
     all_vessels = list(port_repo.vessels.values())
 
     if status_filter:
