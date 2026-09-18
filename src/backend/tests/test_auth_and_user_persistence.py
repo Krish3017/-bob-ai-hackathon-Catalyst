@@ -198,3 +198,47 @@ def test_delete_user_flow_and_safeguards():
     # 6. User is deleted from SQLite
     sqlite_users = _load_users_sqlite()
     assert not any(u["id"] == user_id for u in sqlite_users)
+
+
+def test_admin_can_update_user_password():
+    """Verify admin can reset/update any user's password and the user can immediately login with the new password."""
+    unique_id = uuid.uuid4().hex[:8]
+    test_email = f"pwd.target.{unique_id}@naviops.port"
+
+    # 1. Admin creates user
+    create_res = client.post("/api/auth/users", headers=admin_headers(), json={
+        "full_name": "Reset Password Test",
+        "email": test_email,
+        "password": "initialpassword123",
+        "role": "operations"
+    })
+    assert create_res.status_code == 201
+    user_id = create_res.json()["id"]
+
+    # 2. Non-admin cannot update password
+    ops_token = create_access_token({"sub": "22222222-2222-2222-2222-222222222222", "email": "ops@naviops.port", "role": "operations"})
+    ops_res = client.put(f"/api/auth/users/{user_id}/password", headers={"Authorization": f"Bearer {ops_token}"}, json={
+        "password": "newpassword456"
+    })
+    assert ops_res.status_code == 403
+
+    # 3. Short password rejected
+    short_res = client.put(f"/api/auth/users/{user_id}/password", headers=admin_headers(), json={
+        "password": "123"
+    })
+    assert short_res.status_code == 422 or short_res.status_code == 400
+
+    # 4. Admin updates password successfully
+    update_res = client.put(f"/api/auth/users/{user_id}/password", headers=admin_headers(), json={
+        "password": "newpassword456"
+    })
+    assert update_res.status_code == 200
+
+    # 5. User can log in with new password
+    login_new = client.post("/api/auth/login", json={"email": test_email, "password": "newpassword456"})
+    assert login_new.status_code == 200
+
+    # 6. Old password fails
+    login_old = client.post("/api/auth/login", json={"email": test_email, "password": "initialpassword123"})
+    assert login_old.status_code == 401
+

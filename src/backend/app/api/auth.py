@@ -8,6 +8,7 @@ from app.models.schemas import (
     SignupRequest,
     UserRoleUpdate,
     AdminCreateUserRequest,
+    AdminUpdatePasswordRequest,
     AuthResponse,
     UserResponse,
 )
@@ -242,4 +243,32 @@ def delete_user(
 
     del port_repo.users[user_id]
     return {"message": "User deleted successfully", "id": user_id}
+
+
+@router.put("/users/{user_id}/password", response_model=UserResponse)
+def admin_update_user_password(
+    user_id: str,
+    payload: AdminUpdatePasswordRequest,
+    current_user: UserResponse = Depends(require_role(["admin"]))
+):
+    """
+    Update / reset a user's password directly (Port Manager / Admin only).
+    Enables administrators to assign or update credentials for operations and viewer accounts.
+    """
+    if not payload.password or len(payload.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long."
+        )
+
+    if user_id not in port_repo.users:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    user = port_repo.users[user_id]
+    user["password_hash"] = hash_password(payload.password)
+    port_repo.users[user_id] = user
+    return UserResponse(**user)
 
