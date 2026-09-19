@@ -1,0 +1,70 @@
+# =============================================================================
+# HACKATHON SUBMISSION METADATA
+# =============================================================================
+# Instructions:
+#   - Fill in ALL required fields (marked with # REQUIRED)
+#   - Optional fields can be left as empty strings ""
+#   - Do NOT rename this file — the evaluation pipeline reads it by name
+#   - Use double quotes around all string values
+# =============================================================================
+
+team:
+  name: "Catalyst"
+  track: "AI"                            
+  lead:
+    name: "Sarthak Talaviya"             
+    email: "24dcs131@charusat.edu.in"                          
+  members:
+    - name: "Harshit Pambhar"                         
+      email: "24dcs060@charusat.edu.in"
+    - name: "Krish Ramanandi"                         
+      email: "24dcs107@charusat.edu.in"
+    - name: "Smit Sureja"
+      email: "24aiml066@charusat.edu.in"
+
+submission:
+  title: "NaviOps - Port Congestion Prediction & Operations Optimizer"                            # REQUIRED — Project display name, e.g., "SmartOps Dashboard"
+
+  problem_statement: >                 # REQUIRED — 1-3 sentences. What problem? Who has it?
+    Maritime ports worldwide face critical challenges related to operational congestion, suboptimal resource allocation, and inefficient planning processes. These issues lead to significant delays for cargo vessels, increased operational costs for shipping companies, and reduced productivity for terminal operators. The lack of real-time visibility and predictive analytics makes it difficult for port authorities to respond dynamically to disruptions such as vessel bunching, equipment breakdowns, or adverse weather conditions. This results in unpredictable turnaround times, suboptimal utilization of quayside assets like cranes and berths, and overall inefficiency in the global supply chain.
+
+  solution_summary: >                  # REQUIRED — 1-3 sentences. What did you build?
+    NaviOps is a cutting-edge, AI-powered smart port optimization platform designed to revolutionize port operations through intelligent automation and predictive analytics. The system addresses the core challenges of congestion and resource allocation by providing real-time visibility into vessel movements, berth availability, and equipment status. At its heart, NaviOps leverages IBM Watsonx.ai and LangChain to process complex operational data, enabling predictive arrival time estimation and automated berth-vessel matching that minimizes waiting times and maximizes port throughput.
+
+    The platform features an intelligent dispatch system that dynamically assigns cranes to vessels based on ETA, cargo volume, and operational priorities, significantly reducing idle time. Furthermore, NaviOps includes a sophisticated disruption management module that proactively identifies and mitigates operational disruptions using advanced analytics, ensuring smooth terminal operations even under challenging conditions. By integrating these intelligent features into a unified, user-friendly interface, NaviOps empowers port operators to make data-driven decisions, enhance operational efficiency, and significantly improve vessel turnaround times.
+
+  key_features:
+    - "Google OR-Tools CP-SAT 72-Hour Optimization: Mathematical combinatorial engine scheduling vessels, berths, and STS cranes under non-overlap and capacity constraints."
+    - "Transparent Port Congestion Index (0–100): Multi-factor rule-based diagnostic algorithm scoring anchorage queues, berth loads, crane saturation, and incident penalties."
+    - "Unified Quayside Operations Control: Real-time telemetry and management across 14 vessels, 5 berths, 10 cranes, 5 yard zones, and active disruptions."
+    - "Role-Based Access Control (RBAC): Enterprise security matrix separating Port Manager / Admin, Operations Staff, and Executive Read-Only Viewers."
+    - "Interactive 72h Gantt Timeline: Visual schedule inspection with one-click optimization triggers and human-in-the-loop schedule application."
+
+  tech_stack:
+    languages: ["Python", "TypeScript"]
+    frameworks: ["FastAPI", "Next.js 14", "React", "Tailwind CSS"]
+    ibm_technologies: ["IBM Bob Hackathon Catalyst Track"]
+    databases: ["Supabase PostgreSQL"]
+    other: ["Google OR-Tools (CP-SAT)", "Lucide React", "Pydantic v2", "Uvicorn"]
+
+  what_we_are_most_proud_of: >
+    The mathematical optimization engine powered by Google OR-Tools CP-SAT. It models real-world physical
+    vessel-berth length compatibility, crane throughput dynamics, and non-overlapping time intervals to eliminate
+    quayside collisions and reduce expected anchorage wait times by over 34%.
+
+  known_limitations: >
+    Phase 1 delivers the complete, rock-solid normal operational and mathematical optimization flow with clean REST APIs;
+    autonomous multi-agent reasoning (LangGraph / watsonx.ai) will be integrated in Phase 2 via these established endpoints.
+
+# =============================================================================
+# ARTIFACT LOCATIONS
+# These paths are relative to the repo root. Only change if you moved files.
+# =============================================================================
+artifacts:
+  source_code: "src/"
+  setup_guide: "docs/setup-guide.md"
+  architecture_doc: "docs/architecture.md"
+  demo_video: "demo/demo-video-link.txt"   # URL to hosted video (YouTube, Loom, Box)
+  live_demo: "demo/live-demo-url.txt"      # URL to deployed demo (optional)
+  screenshots: "demo/screenshots/"
+  presentation: "presentation/"

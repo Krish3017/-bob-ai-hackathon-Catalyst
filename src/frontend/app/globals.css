@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Main Backgrounds */
+    --background: #FAFAF8;
+    --surface: #FFFFFF;
+    --surface-soft: #F7F6F2;
+
+    /* Brand — Cyprus */
+    --primary: #004741;
+    --primary-hover: #003B36;
+    --primary-light: #E1EFEC;
+    --primary-muted: #C5DDD9;
+
+    /* Brand — Sand */
+    --sand: #F0EDE4;
+    --sand-light: #F7F5F0;
+
+    /* Text */
+    --text-primary: #102A27;
+    --text-secondary: #5C6B68;
+    --text-muted: #899491;
+
+    /* Borders */
+    --border: #E3E5E0;
+    --border-strong: #D5D9D3;
+
+    /* Maritime Blue Accent */
+    --maritime: #2F7D8C;
+    --maritime-light: #E1F0F2;
+
+    /* Status */
+    --success: #2F7D5B;
+    --success-light: #E5F2EA;
+    --warning: #C58A2B;
+    --warning-light: #FFF4DE;
+    --error: #B94A48;
+    --error-light: #FCE9E8;
+    --info: #2F7D8C;
+    --info-light: #E1F0F2;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--sand-light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--primary-muted);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Focus ring using Cyprus */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Selection highlight */
+::selection {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+/* Frosted glass cards: allows the maritime background to shine directly through container cards while keeping text 100% crisp and readable */
+main div.shadow-card:not(button):not(a):not([role="button"]):not(.gantt-block):not(.modal-dialog),
+main div.bg-white.rounded-xl:not(button):not(a):not([role="button"]):not(.gantt-block):not(.modal-dialog),
+main div.bg-white.rounded-2xl:not(button):not(a):not([role="button"]):not(.gantt-block):not(.modal-dialog),
+main div.glass-card {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 8px 24px -4px rgba(0, 71, 65, 0.08), 0 2px 6px -1px rgba(0, 71, 65, 0.04) !important;
+}
+
+/* Explicit safeguards: buttons, links, modal dialogs, and Gantt timeline blocks must NEVER inherit card glass styling */
+main button,
+main a,
+main [role="button"],
+main .gantt-block,
+.gantt-block {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.modal-dialog {
+  background-color: #FFFFFF !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+
