@@ -100,6 +100,7 @@ class PortRepository:
         self.disruptions = SyncedTable(self, "disruptions")
         self.optimization_runs = SyncedTable(self, "optimization_runs")
         self.schedules = SyncedTable(self, "schedules")
+        self.schedule_version: int = 1
 
         # 1. Seed fallback in-memory defaults
         self.seed_defaults()

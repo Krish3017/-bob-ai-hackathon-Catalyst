@@ -14,6 +14,7 @@ import {
   SimulationResponse,
   SentinelAlertResponse,
 } from "@/types";
+import type { ArrivalRequest, AuditLog } from "@/types/customer";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -306,5 +307,73 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ role }),
     }),
+<<<<<<< Updated upstream
+=======
+  updateUserPassword: (userId: string, password: string) =>
+    fetchWithAuth<User>(`/api/auth/users/${userId}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    }),
+  deleteUser: (userId: string) =>
+    fetchWithAuth<{ message: string; id: string }>(`/api/auth/users/${userId}`, {
+      method: "DELETE",
+    }),
+
+  // Operations Manager — Vessel Arrival Requests
+  getIncomingArrivalRequests: (statusFilter?: string) => {
+    const query = statusFilter && statusFilter !== "ALL" ? `?status_filter=${encodeURIComponent(statusFilter)}` : "";
+    return fetchWithAuth<ArrivalRequest[]>(`/api/operations/arrival-requests${query}`);
+  },
+  getIncomingArrivalRequestDetail: (requestId: string) =>
+    fetchWithAuth<ArrivalRequest>(`/api/operations/arrival-requests/${requestId}`),
+  simulateArrivalRequest: (requestId: string) =>
+    fetchWithAuth<{
+      request_id: string;
+      recommendation: any;
+      simulated_at: string;
+      live_schedule_version: number;
+    }>(`/api/operations/arrival-requests/${requestId}/simulate`, {
+      method: "POST",
+    }),
+  approveArrivalRequest: (
+    requestId: string,
+    payload: {
+      berth_id?: string;
+      assigned_start?: string;
+      assigned_end?: string;
+      schedule_version?: number;
+      notes?: string;
+    }
+  ) =>
+    fetchWithAuth<ArrivalRequest>(`/api/operations/arrival-requests/${requestId}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  proposeAlternativeSchedule: (
+    requestId: string,
+    payload: {
+      proposed_eta: string;
+      proposed_departure: string;
+      proposed_berth_id?: string;
+      operational_reason: string;
+    }
+  ) =>
+    fetchWithAuth<ArrivalRequest>(`/api/operations/arrival-requests/${requestId}/propose-alternative`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  requestChangesForArrival: (requestId: string, payload: { notes: string }) =>
+    fetchWithAuth<ArrivalRequest>(`/api/operations/arrival-requests/${requestId}/request-changes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  rejectArrivalRequest: (requestId: string, payload: { reason: string; comment?: string }) =>
+    fetchWithAuth<ArrivalRequest>(`/api/operations/arrival-requests/${requestId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getArrivalRequestAuditTrail: (requestId: string) =>
+    fetchWithAuth<AuditLog[]>(`/api/operations/arrival-requests/${requestId}/audit-trail`),
+>>>>>>> Stashed changes
 };
 
