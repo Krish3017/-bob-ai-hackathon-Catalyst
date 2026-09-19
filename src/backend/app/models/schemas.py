@@ -307,6 +307,7 @@ class SimulateOptimizationRequest(BaseModel):
     scenario_name: Optional[str] = "What-If Simulation"
     unavailable_berth_ids: Optional[List[str]] = Field(default_factory=list)
     unavailable_crane_ids: Optional[List[str]] = Field(default_factory=list)
+    unavailable_yard_ids: Optional[List[str]] = Field(default_factory=list)
     vessel_delay_hours: Optional[Dict[str, float]] = Field(default_factory=dict)
 
 

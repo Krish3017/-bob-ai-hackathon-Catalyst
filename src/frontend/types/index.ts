@@ -164,6 +164,7 @@ export interface SimulateOptimizationRequest {
   scenario_name?: string;
   unavailable_berth_ids?: string[];
   unavailable_crane_ids?: string[];
+  unavailable_yard_ids?: string[];
   vessel_delay_hours?: Record<string, number>;
 }
 

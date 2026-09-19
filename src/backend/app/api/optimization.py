@@ -160,6 +160,7 @@ def simulate_optimization(
         scenario_name=req.scenario_name or "Custom What-If Scenario",
         unavailable_berth_ids=req.unavailable_berth_ids or [],
         unavailable_crane_ids=req.unavailable_crane_ids or [],
+        unavailable_yard_ids=req.unavailable_yard_ids or [],
         vessel_delay_hours=req.vessel_delay_hours or {},
     )
     return SimulationResponse(

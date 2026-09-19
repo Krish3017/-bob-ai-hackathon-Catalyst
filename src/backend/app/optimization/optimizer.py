@@ -32,7 +32,10 @@ class PortOptimizer:
         # Clone and apply simulation overrides if provided
         sim_unavail_berths = set(self.simulation_overrides.get("unavailable_berth_ids", []))
         sim_unavail_cranes = set(self.simulation_overrides.get("unavailable_crane_ids", []))
+        sim_unavail_yards = set(self.simulation_overrides.get("unavailable_yard_ids", []))
         sim_vessel_delays = self.simulation_overrides.get("vessel_delay_hours", {})
+
+        self.sim_unavail_yards = sim_unavail_yards
 
         # Process berths
         self.berths = []
@@ -50,6 +53,13 @@ class PortOptimizer:
                 c_copy["status"] = "Failed"
             self.cranes.append(c_copy)
 
+        # Map cranes to berths
+        self.crane_berth_map: Dict[str, List[Dict[str, Any]]] = {}
+        for c in self.cranes:
+            b_id = c.get("assigned_berth_id")
+            if b_id:
+                self.crane_berth_map.setdefault(b_id, []).append(c)
+
         self.disruptions = disruptions
 
         # Process vessels with potential delay adjustments
@@ -62,6 +72,8 @@ class PortOptimizer:
                 orig_eta = v_copy.get("eta")
                 if isinstance(orig_eta, str):
                     orig_eta = datetime.fromisoformat(orig_eta.replace("Z", "+00:00"))
+                if isinstance(orig_eta, datetime) and orig_eta.tzinfo is None:
+                    orig_eta = orig_eta.replace(tzinfo=timezone.utc)
                 v_copy["eta"] = orig_eta + timedelta(hours=extra_delay)
                 v_copy["expected_waiting_time"] = float(v_copy.get("expected_waiting_time", 0.0)) + extra_delay
             self.all_vessels.append(v_copy)
@@ -75,7 +87,10 @@ class PortOptimizer:
         )
 
         model = cp_model.CpModel()
-        horizon_slots = self.horizon_hours  # 1-hour time slots from 0 to 72
+        horizon_slots = self.horizon_hours  # Target planning horizon (72h)
+        # Extend scheduling window up to 240h so constrained scenarios allow realistic anchorage queueing
+        # without model infeasibility.
+        max_schedule_window = horizon_slots + 168
 
         # Filter operable berths with graceful fallback
         operable_berths = [b for b in self.berths if b.get("status") != "Unavailable"]
@@ -83,14 +98,14 @@ class PortOptimizer:
             operable_berths = self.berths if self.berths else [
                 {"id": "b-fallback", "berth_code": "B-01", "berth_name": "Main Quay", "max_vessel_length": 400.0}
             ]
-        
-        # Calculate crane fleet throughput per berth
-        # Map operational cranes
-        available_cranes = [c for c in self.cranes if c.get("status") not in ["Failed", "Maintenance"]]
-        avg_crane_rate = 35.0  # moves/hr
-        cranes_per_vessel = 2  # standard 2 cranes allocated per container vessel
 
-        # Vessel variables mapping: vessel_id -> (start_var, end_var, berth_choice_vars, interval_vars)
+        # Available cranes across entire port
+        available_cranes = [c for c in self.cranes if c.get("status") not in ["Failed", "Maintenance"]]
+        operational_crane_codes = [c.get("crane_code", f"CR-0{i+1}") for i, c in enumerate(available_cranes)]
+        if not operational_crane_codes:
+            operational_crane_codes = ["CR-01", "CR-02", "CR-05", "CR-06", "CR-07", "CR-08"]
+
+        # Vessel variables mapping: vessel_id -> dict of variables
         vessel_vars = {}
         berth_intervals = {b["id"]: [] for b in operable_berths}
 
@@ -101,32 +116,28 @@ class PortOptimizer:
             v_len = float(v.get("vessel_length", 300.0))
             v_volume = int(v.get("cargo_volume", 1000))
             v_priority = int(v.get("priority", 2))
-            
-            # Convert ETA to relative hour offset [0, 72] with UTC awareness
+
+            # Convert ETA to relative hour offset with UTC awareness
             eta = v.get("eta")
             if isinstance(eta, str):
                 eta = datetime.fromisoformat(eta.replace("Z", "+00:00"))
-            if eta.tzinfo is None:
+            if isinstance(eta, datetime) and eta.tzinfo is None:
                 eta = eta.replace(tzinfo=timezone.utc)
             eta_offset = max(0, int(math.floor((eta - self.now).total_seconds() / 3600.0)))
-            eta_offset = min(eta_offset, horizon_slots - 4)
+            eta_offset = min(eta_offset, horizon_slots - 2)
 
             # Convert ETD to relative hour offset with UTC awareness
             etd = v.get("etd")
             if isinstance(etd, str):
                 etd = datetime.fromisoformat(etd.replace("Z", "+00:00"))
-            if etd.tzinfo is None:
+            if isinstance(etd, datetime) and etd.tzinfo is None:
                 etd = etd.replace(tzinfo=timezone.utc)
-            etd_offset = max(eta_offset + 2, int(math.ceil((etd - self.now).total_seconds() / 3600.0)))
-
-            # Estimated service duration in hours: cargo_volume / (cranes_allocated * crane_capacity)
-            handling_rate = cranes_per_vessel * avg_crane_rate
-            duration_hours = max(3, min(24, int(math.ceil(v_volume / handling_rate))))
+            etd_offset = max(eta_offset + 4, int(math.ceil((etd - self.now).total_seconds() / 3600.0)))
 
             # Compatible berths based on vessel length
             compatible_berths = [b for b in operable_berths if float(b.get("max_vessel_length", 400.0)) >= v_len]
             if not compatible_berths:
-                # If length exceeds, assign largest available
+                # If length exceeds all operable, assign the largest available
                 compatible_berths = sorted(operable_berths, key=lambda b: float(b.get("max_vessel_length", 0)), reverse=True)[:1]
             if not compatible_berths:
                 compatible_berths = operable_berths[:1]
@@ -134,20 +145,44 @@ class PortOptimizer:
             # Priority weight multiplier: 1 -> 5x, 2 -> 3x, 3 -> 2x, 4 -> 1x
             priority_weight = {1: 5, 2: 3, 3: 2, 4: 1}.get(v_priority, 2)
 
-            start_var = model.NewIntVar(eta_offset, horizon_slots, f"start_{v_id}")
-            end_var = model.NewIntVar(eta_offset + duration_hours, horizon_slots + 24, f"end_{v_id}")
+            start_var = model.NewIntVar(eta_offset, max_schedule_window, f"start_{v_id}")
 
             berth_presences = []
             vessel_intervals_for_berths = {}
+            berth_durations = {}
+            berth_end_vars = {}
+
+            # Yard congestion extra dwell if yard zones are simulated offline/saturated
+            yard_dwell_extra = 3 if self.sim_unavail_yards and v.get("cargo_type") in ["Container", None] else 0
 
             for b in compatible_berths:
                 b_id = b["id"]
+
+                # Determine effective crane handling speed at THIS berth
+                b_cranes = [
+                    c for c in self.crane_berth_map.get(b_id, [])
+                    if c.get("status") not in ["Failed", "Maintenance"]
+                ]
+                if b_cranes:
+                    handling_rate = float(sum(c.get("capacity_per_hour", 35.0) for c in b_cranes))
+                else:
+                    # Emergency / mobile crane rate when all quayside STS cranes on this berth are failed
+                    handling_rate = 18.0
+
+                # Duration on this berth
+                dur_b = max(3, min(48, int(math.ceil(v_volume / handling_rate)) + yard_dwell_extra))
+                berth_durations[b_id] = dur_b
+
                 presence = model.NewBoolVar(f"pres_{v_id}_{b_id}")
                 berth_presences.append(presence)
 
+                end_b_var = model.NewIntVar(eta_offset + dur_b, max_schedule_window + 48, f"end_{v_id}_{b_id}")
+                model.Add(end_b_var == start_var + dur_b).OnlyEnforceIf(presence)
+                berth_end_vars[b_id] = end_b_var
+
                 # Optional interval variable for this berth
                 interval = model.NewOptionalIntervalVar(
-                    start_var, duration_hours, end_var, presence, f"interval_{v_id}_{b_id}"
+                    start_var, dur_b, end_b_var, presence, f"interval_{v_id}_{b_id}"
                 )
                 berth_intervals[b_id].append(interval)
                 vessel_intervals_for_berths[b_id] = presence
@@ -157,7 +192,7 @@ class PortOptimizer:
                 if b_avail:
                     if isinstance(b_avail, str):
                         b_avail = datetime.fromisoformat(b_avail.replace("Z", "+00:00"))
-                    if b_avail.tzinfo is None:
+                    if isinstance(b_avail, datetime) and b_avail.tzinfo is None:
                         b_avail = b_avail.replace(tzinfo=timezone.utc)
                     avail_offset = max(0, int(math.floor((b_avail - self.now).total_seconds() / 3600.0)))
                     if avail_offset > 0:
@@ -168,12 +203,14 @@ class PortOptimizer:
                 model.AddExactlyOne(berth_presences)
 
             # Waiting time = start_var - eta_offset
-            waiting_time_var = model.NewIntVar(0, horizon_slots, f"wait_{v_id}")
+            waiting_time_var = model.NewIntVar(0, max_schedule_window, f"wait_{v_id}")
             model.Add(waiting_time_var == start_var - eta_offset)
 
             # Tardiness penalty beyond ETD
-            delay_var = model.NewIntVar(0, horizon_slots + 24, f"delay_{v_id}")
-            model.Add(delay_var >= end_var - etd_offset)
+            delay_var = model.NewIntVar(0, max_schedule_window + 48, f"delay_{v_id}")
+            # Approximate end using start + average duration for delay objective
+            avg_dur = sum(berth_durations.values()) // max(1, len(berth_durations))
+            model.Add(delay_var >= (start_var + avg_dur) - etd_offset)
             model.Add(delay_var >= 0)
 
             # Weighted objective component
@@ -183,13 +220,13 @@ class PortOptimizer:
             vessel_vars[v_id] = {
                 "vessel": v,
                 "start_var": start_var,
-                "end_var": end_var,
                 "waiting_var": waiting_time_var,
                 "delay_var": delay_var,
-                "duration_hours": duration_hours,
+                "berth_durations": berth_durations,
+                "berth_end_vars": berth_end_vars,
                 "eta_offset": eta_offset,
                 "etd_offset": etd_offset,
-                "presences": {b["id"]: presence for b, presence in zip(compatible_berths, berth_presences)}
+                "presences": {b["id"]: p for b, p in zip(compatible_berths, berth_presences)}
             }
 
         # Constraint 2: Non-overlapping berth assignments
@@ -210,18 +247,12 @@ class PortOptimizer:
         total_delay_hours = 0.0
         run_id = str(uuid.uuid4())
 
-        # Pool available cranes to assign
-        operational_crane_codes = [c.get("crane_code", f"CR-0{i+1}") for i, c in enumerate(available_cranes)]
-        if not operational_crane_codes:
-            operational_crane_codes = ["CR-01", "CR-02", "CR-05", "CR-06", "CR-07", "CR-08"]
-
         if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
             opt_status = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
-            
+
             for idx, (v_id, v_data) in enumerate(vessel_vars.items()):
                 v = v_data["vessel"]
                 start_h = solver.Value(v_data["start_var"])
-                end_h = solver.Value(v_data["end_var"])
                 wait_h = solver.Value(v_data["waiting_var"])
                 delay_h = solver.Value(v_data["delay_var"])
 
@@ -248,10 +279,16 @@ class PortOptimizer:
                         assigned_berth = {"id": "b-fallback", "berth_code": "B-01", "berth_name": "Main Quay"}
                     assigned_berth_id = assigned_berth["id"]
 
-                # Assign 2 cranes deterministically based on berth or index
-                c1_idx = (idx * 2) % len(operational_crane_codes)
-                c2_idx = (idx * 2 + 1) % len(operational_crane_codes)
-                assigned_cranes = [operational_crane_codes[c1_idx], operational_crane_codes[c2_idx]]
+                dur_h = v_data["berth_durations"].get(assigned_berth_id, 12)
+                end_h = start_h + dur_h
+
+                # Determine actual operational cranes on this berth
+                berth_assigned_cranes = [
+                    c.get("crane_code") for c in self.crane_berth_map.get(assigned_berth_id, [])
+                    if c.get("status") not in ["Failed", "Maintenance"]
+                ]
+                if not berth_assigned_cranes:
+                    berth_assigned_cranes = [operational_crane_codes[idx % len(operational_crane_codes)]]
 
                 planned_start_dt = self.now + timedelta(hours=start_h)
                 planned_end_dt = self.now + timedelta(hours=end_h)
@@ -259,7 +296,7 @@ class PortOptimizer:
                 reason = (
                     f"Optimal allocation on {assigned_berth.get('berth_code')} based on "
                     f"Priority {v.get('priority')} rating and length compatibility ({v.get('vessel_length')}m). "
-                    f"Assigned STS cranes {', '.join(assigned_cranes)} providing {cranes_per_vessel * avg_crane_rate:.0f} moves/hr."
+                    f"Assigned STS cranes {', '.join(berth_assigned_cranes)}."
                 )
 
                 schedules_result.append(
@@ -274,9 +311,9 @@ class PortOptimizer:
                         berth_name=assigned_berth.get("berth_name", "Terminal Berth"),
                         planned_start=planned_start_dt,
                         planned_end=planned_end_dt,
-                        duration_hours=float(v_data["duration_hours"]),
+                        duration_hours=float(dur_h),
                         waiting_time=float(wait_h),
-                        assigned_cranes=assigned_cranes,
+                        assigned_cranes=berth_assigned_cranes,
                         assignment_reason=reason,
                         status="Proposed"
                     )
@@ -284,11 +321,73 @@ class PortOptimizer:
 
             # Sort schedule by start time
             schedules_result.sort(key=lambda s: s.planned_start)
-
             obj_val = solver.ObjectiveValue() if status == cp_model.OPTIMAL else float(total_waiting_hours * 2)
+
         else:
-            opt_status = "FEASIBLE"  # Graceful fallback heuristic
-            obj_val = 150.0
+            # Analytical Priority Queue Dispatch Heuristic (Guaranteeing accurate fallback schedules)
+            opt_status = "FEASIBLE"
+            sorted_vessels = sorted(
+                self.vessels,
+                key=lambda v: (
+                    int(v.get("priority", 2)),
+                    v.get("eta") if isinstance(v.get("eta"), datetime) else datetime.now(timezone.utc)
+                )
+            )
+            berth_free_times = {b["id"]: 0 for b in operable_berths}
+
+            for idx, v in enumerate(sorted_vessels):
+                v_id = v["id"]
+                v_len = float(v.get("vessel_length", 300.0))
+                v_vol = int(v.get("cargo_volume", 1000))
+                eta = v.get("eta")
+                if isinstance(eta, str):
+                    eta = datetime.fromisoformat(eta.replace("Z", "+00:00"))
+                if isinstance(eta, datetime) and eta.tzinfo is None:
+                    eta = eta.replace(tzinfo=timezone.utc)
+                eta_offset = max(0, int(math.floor((eta - self.now).total_seconds() / 3600.0)))
+
+                comp_berths = [b for b in operable_berths if float(b.get("max_vessel_length", 400.0)) >= v_len]
+                if not comp_berths:
+                    comp_berths = operable_berths[:1]
+
+                # Select berth with earliest available start time
+                best_b = min(comp_berths, key=lambda b: max(eta_offset, berth_free_times.get(b["id"], 0)))
+                start_h = max(eta_offset, berth_free_times.get(best_b["id"], 0))
+
+                b_cranes = [
+                    c for c in self.crane_berth_map.get(best_b["id"], [])
+                    if c.get("status") not in ["Failed", "Maintenance"]
+                ]
+                rate = sum(c.get("capacity_per_hour", 35.0) for c in b_cranes) if b_cranes else 18.0
+                yard_dwell_extra = 3 if self.sim_unavail_yards and v.get("cargo_type") in ["Container", None] else 0
+                dur_h = max(3, min(48, int(math.ceil(v_vol / rate)) + yard_dwell_extra))
+                end_h = start_h + dur_h
+                berth_free_times[best_b["id"]] = end_h
+
+                wait_h = start_h - eta_offset
+                total_waiting_hours += wait_h
+
+                berth_cranes_list = [c.get("crane_code") for c in b_cranes] if b_cranes else ["CR-01"]
+                schedules_result.append(
+                    ScheduleItemResponse(
+                        id=str(uuid.uuid4()),
+                        optimization_run_id=run_id,
+                        vessel_id=v_id,
+                        vessel_code=v.get("vessel_code", "UNKNOWN"),
+                        vessel_name=v.get("vessel_name", "Unknown Vessel"),
+                        berth_id=best_b["id"],
+                        berth_code=best_b.get("berth_code", "B-01"),
+                        berth_name=best_b.get("berth_name", "Terminal Berth"),
+                        planned_start=self.now + timedelta(hours=start_h),
+                        planned_end=self.now + timedelta(hours=end_h),
+                        duration_hours=float(dur_h),
+                        waiting_time=float(wait_h),
+                        assigned_cranes=berth_cranes_list,
+                        assignment_reason="Priority dispatch scheduling fallback under constrained resources.",
+                        status="Proposed"
+                    )
+                )
+            obj_val = float(total_waiting_hours * 2.5)
 
         run_record = {
             "id": run_id,
@@ -303,20 +402,16 @@ class PortOptimizer:
             "metrics": {
                 "vessels_scheduled": len(schedules_result),
                 "avg_waiting_hours": round(total_waiting_hours / max(1, len(schedules_result)), 1),
-                "berth_occupancy_ratio": round(min(0.92, (total_waiting_hours + 40) / (max(1, len(operable_berths)) * 72)), 2),
-                # Crane utilization: fraction of operable cranes currently active (Busy)
+                "berth_occupancy_ratio": round(min(0.95, (total_waiting_hours + 40) / (max(1, len(operable_berths)) * 72)), 2),
                 "crane_utilization_ratio": round(
                     len([c for c in self.cranes if c.get("status") == "Busy"]) /
                     max(1, len([c for c in self.cranes if c.get("status") in ["Available", "Busy"]])),
                     2
                 ),
-                # Delay reduction: how much waiting time the optimizer eliminates vs the pre-run baseline
                 "delay_reduction_pct": round(
-                    max(0.0, (pre_opt_waiting_hours - total_waiting_hours) /
-                        max(1.0, pre_opt_waiting_hours) * 100.0),
-                    1
+                    max(0.0, ((pre_opt_waiting_hours - total_waiting_hours) / max(1.0, pre_opt_waiting_hours)) * 100.0), 1
                 ),
-                # Demurrage Financials ($1,250/hr average demurrage cost across container fleet)
+                # Financial: Demurrage exposure ($1,250 / waiting hour)
                 "demurrage_cost_usd": round(float(total_waiting_hours * 1250.0), 2),
                 "demurrage_saved_usd": round(max(0.0, (pre_opt_waiting_hours - total_waiting_hours) * 1250.0), 2),
                 # GreenPort ESG: Decarbonization from reduced anchorage idling (0.35 MT CO2 / waiting hr)
@@ -333,6 +428,7 @@ def run_whatif_simulation(
     scenario_name: str = "What-If Simulation",
     unavailable_berth_ids: Optional[List[str]] = None,
     unavailable_crane_ids: Optional[List[str]] = None,
+    unavailable_yard_ids: Optional[List[str]] = None,
     vessel_delay_hours: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """
@@ -346,14 +442,15 @@ def run_whatif_simulation(
 
     unavail_berths = list(unavailable_berth_ids or [])
     unavail_cranes = list(unavailable_crane_ids or [])
+    unavail_yards = list(unavailable_yard_ids or [])
     delays = dict(vessel_delay_hours or {})
 
     simulation_id = f"sim-{uuid.uuid4().hex[:8]}"
 
-    # Structured debug logging (Requirement 14 & 15)
+    # Structured debug logging
     logger.info(
-        "[WHATIF_CANONICAL_REQUEST] sim_id=%s | scenario=%s | unavail_berths=%s | unavail_cranes=%s | delays_count=%d",
-        simulation_id, scenario_name, unavail_berths, unavail_cranes, len(delays)
+        "[WHATIF_CANONICAL_REQUEST] sim_id=%s | scenario=%s | unavail_berths=%s | unavail_cranes=%s | unavail_yards=%s | delays_count=%d",
+        simulation_id, scenario_name, unavail_berths, unavail_cranes, unavail_yards, len(delays)
     )
 
     # 1. Baseline optimization run
@@ -372,6 +469,7 @@ def run_whatif_simulation(
     overrides = {
         "unavailable_berth_ids": unavail_berths,
         "unavailable_crane_ids": unavail_cranes,
+        "unavailable_yard_ids": unavail_yards,
         "vessel_delay_hours": delays
     }
     sim_optimizer = PortOptimizer(
@@ -395,6 +493,17 @@ def run_whatif_simulation(
         sim_metrics.get("co2_emissions_mt", 0.0) - baseline_metrics.get("co2_emissions_mt", 0.0), 1
     )
 
+    # Congestion score calculation with simulated resources
+    sim_berths = [b for b in port_repo.berths.values() if b["id"] not in unavail_berths]
+    sim_cranes = [c for c in port_repo.cranes.values() if c["id"] not in unavail_cranes]
+    sim_yards = []
+    for y in port_repo.yards.values():
+        y_copy = dict(y)
+        if y_copy["id"] in unavail_yards:
+            y_copy["occupied_capacity"] = y_copy.get("total_capacity", 5000)
+            y_copy["status"] = "Congested"
+        sim_yards.append(y_copy)
+
     baseline_congestion = calculate_port_congestion(
         vessels=list(port_repo.vessels.values()),
         berths=list(port_repo.berths.values()),
@@ -402,7 +511,8 @@ def run_whatif_simulation(
         yards=list(port_repo.yards.values()),
         disruptions=list(port_repo.disruptions.values())
     )
-    extra_penalty = len(unavail_berths) * 5.0 + len(unavail_cranes) * 3.0
+
+    extra_penalty = len(unavail_berths) * 5.0 + len(unavail_cranes) * 3.0 + len(unavail_yards) * 4.0
     sim_congestion_score = round(min(100.0, baseline_congestion.score + extra_penalty), 1)
     congestion_delta = round(sim_congestion_score - baseline_congestion.score, 1)
 
@@ -419,6 +529,7 @@ def run_whatif_simulation(
     bottlenecks = []
     berth_lookup = {b["id"]: b for b in port_repo.berths.values()}
     crane_lookup = {c["id"]: c for c in port_repo.cranes.values()}
+    yard_lookup = {y["id"]: y for y in port_repo.yards.values()}
 
     for b_id in unavail_berths:
         b_info = berth_lookup.get(b_id)
@@ -428,7 +539,14 @@ def run_whatif_simulation(
     for c_id in unavail_cranes:
         c_info = crane_lookup.get(c_id)
         c_code = c_info.get("crane_code", c_id) if c_info else c_id
-        bottlenecks.append(f"Quay Crane {c_code} offline (throughput reduced by ~35 moves/hr)")
+        rate = c_info.get("capacity_per_hour", 35) if c_info else 35
+        bottlenecks.append(f"Quay Crane {c_code} offline (throughput reduced by ~{rate} moves/hr)")
+
+    for y_id in unavail_yards:
+        y_info = yard_lookup.get(y_id)
+        y_code = y_info.get("yard_code", y_id) if y_info else y_id
+        y_name = y_info.get("yard_name", "") if y_info else ""
+        bottlenecks.append(f"Yard Zone {y_code} ({y_name}) saturated / transfer buffer constrained")
 
     delayed_vessels = [
         s for s in sim_run["schedules"]
@@ -457,6 +575,11 @@ def run_whatif_simulation(
         ]
         recommendations.append(
             f"Reroute inbound high-priority container vessels to operable berths: {', '.join(operable_b_codes)}."
+        )
+    if unavail_yards:
+        yard_codes = [yard_lookup[y]["yard_code"] for y in unavail_yards if y in yard_lookup]
+        recommendations.append(
+            f"Activate secondary drayage and rail shuttle transfers from {', '.join(yard_codes)} to relieve yard stacking density."
         )
     if waiting_delta > 0:
         recommendations.append(
@@ -511,4 +634,3 @@ def run_whatif_simulation(
         "recommendations": recommendations,
         "summary": summary_text,
     }
-

@@ -227,6 +227,11 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                         "items": {"type": "string"},
                         "description": "Exact crane codes (e.g. ['CR-05', 'CR-06']) to simulate as failed/offline. Do not pass placeholder or invented codes."
                     },
+                    "unavailable_yard_codes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Exact yard zone codes (e.g. ['YZ-01', 'YZ-02']) to simulate as full, congested, or unavailable. Do not pass placeholder or invented codes."
+                    },
                     "additional_fleet_delay_hours": {
                         "type": "number",
                         "description": "Additional fleet arrival delay in hours (e.g. 2 or 2.0). Use when the user specifies an arrival delay, storm delay, or fleet schedule delay."
@@ -714,6 +719,39 @@ def _get_latest_optimization_plan() -> Dict[str, Any]:
     }
 
 
+import re
+
+
+def _normalize_crane_code(raw: Any) -> str:
+    """Normalize crane input like 'CR 03', 'cr03', 'cr-3', 'CRANE 3' -> 'CR-03'."""
+    s = str(raw).strip().upper()
+    cleaned = re.sub(r"[\s_]+", "", s)
+    m = re.match(r"^(?:CRANE|CR)[-]?0*(\d+)$", cleaned)
+    if m:
+        return f"CR-{int(m.group(1)):02d}"
+    return s
+
+
+def _normalize_berth_code(raw: Any) -> str:
+    """Normalize berth input like 'B 01', 'b01', 'b-1', 'BERTH 1' -> 'B-01'."""
+    s = str(raw).strip().upper()
+    cleaned = re.sub(r"[\s_]+", "", s)
+    m = re.match(r"^(?:BERTH|B)[-]?0*(\d+)$", cleaned)
+    if m:
+        return f"B-{int(m.group(1)):02d}"
+    return s
+
+
+def _normalize_yard_code(raw: Any) -> str:
+    """Normalize yard input like 'YZ 01', 'yz01', 'y-01', 'Y 1', 'YARD 1' -> 'YZ-01'."""
+    s = str(raw).strip().upper()
+    cleaned = re.sub(r"[\s_]+", "", s)
+    m = re.match(r"^(?:YARDZONE|YARD|YZ|Y)[-]?0*(\d+)$", cleaned)
+    if m:
+        return f"YZ-{int(m.group(1)):02d}"
+    return s
+
+
 def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
     """Run counterfactual What-If optimization simulation with strict resource ID validation."""
     from app.optimization.optimizer import run_whatif_simulation
@@ -721,19 +759,34 @@ def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
     scenario_name = str(args.get("scenario_name") or "What-If Simulation")
     raw_berths = args.get("unavailable_berth_codes") or []
     raw_cranes = args.get("unavailable_crane_codes") or []
+    raw_yards = args.get("unavailable_yard_codes") or args.get("congested_yard_codes") or []
 
-    unavail_berth_codes = [str(c).upper().strip() for c in raw_berths if str(c).strip()]
-    unavail_crane_codes = [str(c).upper().strip() for c in raw_cranes if str(c).strip()]
+    # Clean & normalize IDs (e.g. 'CR 03' -> 'CR-03')
+    unavail_berth_codes = [_normalize_berth_code(c) for c in raw_berths if str(c).strip()]
+    unavail_crane_codes = [_normalize_crane_code(c) for c in raw_cranes if str(c).strip()]
+    unavail_yard_codes = [_normalize_yard_code(c) for c in raw_yards if str(c).strip()]
 
-    # If neither berths nor cranes were provided, return validation error
-    if not unavail_berth_codes and not unavail_crane_codes:
+    # Resolve additional fleet delay hours
+    raw_delay = (
+        args.get("additional_fleet_delay_hours")
+        or args.get("fleet_delay_hours")
+        or args.get("delay_hours")
+        or 0.0
+    )
+    try:
+        fleet_delay_hours = float(raw_delay)
+    except (TypeError, ValueError):
+        fleet_delay_hours = 0.0
+
+    # If neither berths, cranes, yards, nor delays were provided, return validation error
+    if not unavail_berth_codes and not unavail_crane_codes and not unavail_yard_codes and fleet_delay_hours == 0:
         return {
             "status": "validation_error",
             "error_type": "missing_resource_ids",
             "message": (
-                "No specific crane or berth IDs were provided. "
-                "Ask the user which specific crane IDs (e.g. CR-05, CR-06) or "
-                "berth IDs (e.g. B-03, B-04) should be simulated."
+                "No specific resource IDs were provided. "
+                "Ask the user which specific crane IDs (e.g. CR-05, CR-06), "
+                "berth IDs (e.g. B-03, B-04), or yard zone IDs (e.g. YZ-01, YZ-02) should be simulated."
             ),
         }
 
@@ -787,32 +840,45 @@ def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
             "message": msg,
         }
 
+    # Validate yard IDs against real database
+    known_yards = {y.get("yard_code", "").upper(): y for y in port_repo.yards.values()}
+    invalid_yards = [y for y in unavail_yard_codes if y not in known_yards]
+    valid_yards = [y for y in unavail_yard_codes if y in known_yards]
+
+    if invalid_yards:
+        valid_list_str = ", ".join(sorted(known_yards.keys()))
+        if valid_yards:
+            msg = (
+                f"{', '.join(valid_yards)} was found, but {', '.join(invalid_yards)} does not exist in the current port data. "
+                f"Valid yard zones are {valid_list_str}. Please provide a valid yard ID."
+            )
+        else:
+            msg = (
+                f"{', '.join(invalid_yards)} does not exist in the current port data. "
+                f"Valid yard zones are {valid_list_str}. Please provide a valid yard ID."
+            )
+        return {
+            "status": "validation_error",
+            "error_type": "invalid_yard_codes",
+            "invalid_yards": invalid_yards,
+            "valid_yards": valid_yards,
+            "message": msg,
+        }
+
     # Resolve IDs
     unavail_berth_ids = [known_berths[code]["id"] for code in unavail_berth_codes]
     unavail_crane_ids = [known_cranes[code]["id"] for code in unavail_crane_codes]
-
-    # Resolve additional fleet delay hours
-    raw_delay = (
-        args.get("additional_fleet_delay_hours")
-        or args.get("fleet_delay_hours")
-        or args.get("delay_hours")
-        or 0.0
-    )
-    try:
-        fleet_delay_hours = float(raw_delay)
-    except (TypeError, ValueError):
-        fleet_delay_hours = 0.0
+    unavail_yard_ids = [known_yards[code]["id"] for code in unavail_yard_codes]
 
     # Build canonical vessel_delay_hours dict matching What-If Studio:
-    # (vessel_delay_hours: simDelayHours > 0 ? Object.fromEntries(vessels.map(v => [v.id, simDelayHours])) : {})
     vessel_delays: Dict[str, float] = {}
     if fleet_delay_hours > 0:
         vessel_delays = {v["id"]: fleet_delay_hours for v in port_repo.vessels.values()}
 
-    # Structured debug logging for Bob Copilot What-If request (Requirement 14)
+    # Structured debug logging for Bob Copilot What-If request
     logger.info(
-        "[BOB_WHATIF_REQUEST] berths=%s (%s) | cranes=%s (%s) | fleet_delay_hours=%.1f",
-        unavail_berth_codes, unavail_berth_ids, unavail_crane_codes, unavail_crane_ids, fleet_delay_hours
+        "[BOB_WHATIF_REQUEST] berths=%s (%s) | cranes=%s (%s) | yards=%s (%s) | fleet_delay_hours=%.1f",
+        unavail_berth_codes, unavail_berth_ids, unavail_crane_codes, unavail_crane_ids, unavail_yard_codes, unavail_yard_ids, fleet_delay_hours
     )
 
     # Run shared canonical simulation engine
@@ -820,6 +886,7 @@ def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
         scenario_name=scenario_name,
         unavailable_berth_ids=unavail_berth_ids,
         unavailable_crane_ids=unavail_crane_ids,
+        unavailable_yard_ids=unavail_yard_ids,
         vessel_delay_hours=vessel_delays,
     )
 
@@ -842,6 +909,10 @@ def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
             "simulated_unavailable_cranes": [
                 {"code": code, "name": known_cranes[code].get("crane_name")}
                 for code in unavail_crane_codes
+            ],
+            "simulated_unavailable_yards": [
+                {"code": code, "name": known_yards[code].get("yard_name")}
+                for code in unavail_yard_codes
             ],
             "additional_fleet_delay_hours": fleet_delay_hours,
             "baseline": {

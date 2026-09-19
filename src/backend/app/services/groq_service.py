@@ -123,11 +123,14 @@ If the user already provided the exact required resource IDs, execute the simula
 - "What if B-03 and B-04 reach maximum capacity?" -> Run simulation immediately.
 - "What if CR-05 and CR-06 fail and B-03 and B-04 reach maximum capacity?" -> Run simulation immediately.
 - "What if B-05 berth fails, CR-02 fails and additional delay is 2hr?" -> All parameters provided. Call `simulate_scenario(unavailable_berth_codes=["B-05"], unavailable_crane_codes=["CR-02"], additional_fleet_delay_hours=2)` immediately.
+- "What if YZ-01 yard is full / congested?" -> Call `simulate_scenario(unavailable_yard_codes=["YZ-01"])` immediately.
 
 ### CRITICAL RULE 4: VALIDATE RESOURCE IDs
-Valid Crane IDs: CR-01, CR-02, CR-03, CR-04, CR-05, CR-06, CR-07, CR-08, CR-09, CR-10.
-Valid Berth IDs: B-01, B-02, B-03, B-04, B-05.
-If the user specifies an invalid or non-existent resource ID (e.g. CR-99, B-99):
+Valid Crane IDs: CR-01, CR-02, CR-03, CR-04, CR-05, CR-06, CR-07, CR-08, CR-09, CR-10 (also recognize inputs like 'CR 03', 'CR03').
+Valid Berth IDs: B-01, B-02, B-03, B-04, B-05 (also recognize inputs like 'B 01', 'B01').
+Valid Yard Zone IDs: YZ-01, YZ-02, YZ-03, YZ-04, YZ-05 (also recognize inputs like 'YZ 01', 'Y-01', 'Yard 1').
+When invoking simulate_scenario, always format and pass canonical hyphenated codes (e.g. 'CR-03', 'B-02', 'YZ-01').
+If the user specifies an invalid or non-existent resource ID (e.g. CR-99, B-99, YZ-99):
 - Do NOT run the simulation. Do NOT fabricate or run a partial simulation.
 - Reject the invalid ID clearly:
   Example: "CR-05 was found, but CR-99 does not exist in the current port data. Valid cranes are CR-01 through CR-10. Please provide a valid crane ID."
@@ -230,6 +233,43 @@ class GroqCopilotService:
         self._client = Groq(api_key=api_key)
         return self._client
 
+    def _call_groq_resilient(self, client, **kwargs):
+        """
+        Execute chat completion with automatic fallback if primary model hits rate limits.
+        Falls back to available fast inference models (e.g. openai/gpt-oss-20b).
+        """
+        requested_model = kwargs.get("model") or settings.GROQ_MODEL
+        candidate_models = [requested_model]
+        for fallback in ["openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
+
+        last_exc = None
+        for model_name in candidate_models:
+            try:
+                call_args = dict(kwargs)
+                call_args["model"] = model_name
+                return client.chat.completions.create(**call_args)
+            except Exception as exc:
+                err_text = str(exc).lower()
+                is_rate_limit = (
+                    "rate limit" in err_text
+                    or "429" in err_text
+                    or "tokens per day" in err_text
+                    or "tpd" in err_text
+                    or "rate_limit_exceeded" in err_text
+                )
+                if is_rate_limit and model_name != candidate_models[-1]:
+                    logger.warning(
+                        "Groq model %s rate limited (429/TPD). Retrying with fallback model...",
+                        model_name,
+                    )
+                    last_exc = exc
+                    continue
+                raise exc
+        if last_exc:
+            raise last_exc
+
     # ------------------------------------------------------------------
     # Primary entry point (backward-compatible with Phase 1 callers)
     # ------------------------------------------------------------------
@@ -312,7 +352,8 @@ class GroqCopilotService:
             rounds_used = round_num + 1
 
             try:
-                completion = client.chat.completions.create(
+                completion = self._call_groq_resilient(
+                    client,
                     model=settings.GROQ_MODEL,
                     messages=messages,
                     tools=TOOL_DEFINITIONS,
@@ -411,7 +452,8 @@ class GroqCopilotService:
             _MAX_TOOL_ROUNDS,
         )
         try:
-            final_completion = client.chat.completions.create(
+            final_completion = self._call_groq_resilient(
+                client,
                 model=settings.GROQ_MODEL,
                 messages=messages,
                 temperature=0.3,
@@ -468,7 +510,8 @@ class GroqCopilotService:
         messages.append({"role": "user", "content": user_message})
 
         try:
-            completion = client.chat.completions.create(
+            completion = self._call_groq_resilient(
+                client,
                 model=settings.GROQ_MODEL,
                 messages=messages,
                 temperature=0.4,
