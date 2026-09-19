@@ -311,12 +311,15 @@ class SimulateOptimizationRequest(BaseModel):
 
 
 class SimulationResponse(BaseModel):
+    simulation_id: Optional[str] = None
     scenario_name: str
     baseline_metrics: Dict[str, Any]
     simulated_metrics: Dict[str, Any]
     deltas: Dict[str, Any]
     simulated_schedules: List[ScheduleItemResponse]
     summary: str
+    bottlenecks: Optional[List[str]] = None
+    recommendations: Optional[List[str]] = None
 
 
 # -----------------------------------------------------------------------------

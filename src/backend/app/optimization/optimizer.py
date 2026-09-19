@@ -1,9 +1,12 @@
 import math
 import uuid
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Tuple, Optional
 from ortools.sat.python import cp_model
 from app.models.schemas import OptimizationRunResponse, ScheduleItemResponse
+
+logger = logging.getLogger("naviops.optimization.whatif")
 
 
 class PortOptimizer:
@@ -324,3 +327,188 @@ class PortOptimizer:
         }
 
         return run_record
+
+
+def run_whatif_simulation(
+    scenario_name: str = "What-If Simulation",
+    unavailable_berth_ids: Optional[List[str]] = None,
+    unavailable_crane_ids: Optional[List[str]] = None,
+    vessel_delay_hours: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Unified What-If Scenario Sandbox Engine.
+    Executes counterfactual OR-Tools CP-SAT baseline vs simulated optimization
+    and calculates operational deltas, bottlenecks, and recommendations.
+    Shared by both What-If Studio API and Bob Copilot tool layer.
+    """
+    from app.core.database import port_repo
+    from app.congestion.calculator import calculate_port_congestion
+
+    unavail_berths = list(unavailable_berth_ids or [])
+    unavail_cranes = list(unavailable_crane_ids or [])
+    delays = dict(vessel_delay_hours or {})
+
+    simulation_id = f"sim-{uuid.uuid4().hex[:8]}"
+
+    # Structured debug logging (Requirement 14 & 15)
+    logger.info(
+        "[WHATIF_CANONICAL_REQUEST] sim_id=%s | scenario=%s | unavail_berths=%s | unavail_cranes=%s | delays_count=%d",
+        simulation_id, scenario_name, unavail_berths, unavail_cranes, len(delays)
+    )
+
+    # 1. Baseline optimization run
+    baseline_optimizer = PortOptimizer(
+        vessels=list(port_repo.vessels.values()),
+        berths=list(port_repo.berths.values()),
+        cranes=list(port_repo.cranes.values()),
+        disruptions=list(port_repo.disruptions.values()),
+        horizon_hours=72
+    )
+    baseline_run = baseline_optimizer.solve()
+    baseline_metrics = baseline_run["metrics"]
+    baseline_waiting = float(baseline_run.get("total_waiting_time", 0.0))
+
+    # 2. Simulated optimization run with overrides
+    overrides = {
+        "unavailable_berth_ids": unavail_berths,
+        "unavailable_crane_ids": unavail_cranes,
+        "vessel_delay_hours": delays
+    }
+    sim_optimizer = PortOptimizer(
+        vessels=list(port_repo.vessels.values()),
+        berths=list(port_repo.berths.values()),
+        cranes=list(port_repo.cranes.values()),
+        disruptions=list(port_repo.disruptions.values()),
+        horizon_hours=72,
+        simulation_overrides=overrides
+    )
+    sim_run = sim_optimizer.solve()
+    sim_metrics = sim_run["metrics"]
+    sim_waiting = float(sim_run.get("total_waiting_time", 0.0))
+
+    # 3. Calculate deltas
+    waiting_delta = round(sim_waiting - baseline_waiting, 1)
+    demurrage_delta = round(
+        sim_metrics.get("demurrage_cost_usd", 0.0) - baseline_metrics.get("demurrage_cost_usd", 0.0), 2
+    )
+    co2_delta = round(
+        sim_metrics.get("co2_emissions_mt", 0.0) - baseline_metrics.get("co2_emissions_mt", 0.0), 1
+    )
+
+    baseline_congestion = calculate_port_congestion(
+        vessels=list(port_repo.vessels.values()),
+        berths=list(port_repo.berths.values()),
+        cranes=list(port_repo.cranes.values()),
+        yards=list(port_repo.yards.values()),
+        disruptions=list(port_repo.disruptions.values())
+    )
+    extra_penalty = len(unavail_berths) * 5.0 + len(unavail_cranes) * 3.0
+    sim_congestion_score = round(min(100.0, baseline_congestion.score + extra_penalty), 1)
+    congestion_delta = round(sim_congestion_score - baseline_congestion.score, 1)
+
+    deltas = {
+        "waiting_time_delta_hours": waiting_delta,
+        "queue_waiting_delta_hours": waiting_delta,
+        "demurrage_delta_usd": demurrage_delta,
+        "co2_delta_mt": co2_delta,
+        "congestion_score_delta": congestion_delta,
+        "congestion_index_delta": congestion_delta,
+    }
+
+    # 4. Identify primary bottlenecks
+    bottlenecks = []
+    berth_lookup = {b["id"]: b for b in port_repo.berths.values()}
+    crane_lookup = {c["id"]: c for c in port_repo.cranes.values()}
+
+    for b_id in unavail_berths:
+        b_info = berth_lookup.get(b_id)
+        b_code = b_info.get("berth_code", b_id) if b_info else b_id
+        bottlenecks.append(f"Berth {b_code} unavailable / at maximum capacity")
+
+    for c_id in unavail_cranes:
+        c_info = crane_lookup.get(c_id)
+        c_code = c_info.get("crane_code", c_id) if c_info else c_id
+        bottlenecks.append(f"Quay Crane {c_code} offline (throughput reduced by ~35 moves/hr)")
+
+    delayed_vessels = [
+        s for s in sim_run["schedules"]
+        if getattr(s, "waiting_time", 0.0) > 0.0
+    ]
+    delayed_vessels.sort(key=lambda s: getattr(s, "waiting_time", 0.0), reverse=True)
+    if delayed_vessels:
+        for s in delayed_vessels[:2]:
+            bottlenecks.append(
+                f"Vessel {s.vessel_name} experiences {s.waiting_time:.1f}h waiting time on {s.berth_code}"
+            )
+
+    if not bottlenecks:
+        bottlenecks.append("Operations absorbed within normal operational tolerances.")
+
+    # 5. Formulate optimizer recommendations
+    recommendations = []
+    if unavail_cranes:
+        crane_codes = [crane_lookup[c]["crane_code"] for c in unavail_cranes if c in crane_lookup]
+        recommendations.append(
+            f"Prioritize rapid maintenance dispatch on {', '.join(crane_codes)} to restore quayside crane handling capacity."
+        )
+    if unavail_berths:
+        operable_b_codes = [
+            b["berth_code"] for b in port_repo.berths.values() if b["id"] not in unavail_berths
+        ]
+        recommendations.append(
+            f"Reroute inbound high-priority container vessels to operable berths: {', '.join(operable_b_codes)}."
+        )
+    if waiting_delta > 0:
+        recommendations.append(
+            f"Notify shipping lines of projected {abs(waiting_delta):.1f}h cumulative anchorage delay to mitigate demurrage exposure."
+        )
+    if not recommendations:
+        recommendations.append("Current berth and crane allocations sufficient to absorb simulated changes without rescheduling.")
+
+    impact_dir = "increase" if waiting_delta >= 0 else "reduction"
+    cost_dir = "added cost" if demurrage_delta >= 0 else "cost savings"
+    summary_text = (
+        f"Simulated scenario '{scenario_name}' results in a {abs(waiting_delta):.1f}h {impact_dir} "
+        f"in cumulative vessel waiting time with ${abs(demurrage_delta):,.0f} {cost_dir}. "
+        f"Congestion index shifts by {congestion_delta:+.1f} points."
+    )
+
+    # Detailed schedule summary for full transparency
+    schedules_summary = []
+    for s in sim_run["schedules"]:
+        start_str = s.planned_start.isoformat() if hasattr(s.planned_start, "isoformat") else str(s.planned_start)
+        end_str = s.planned_end.isoformat() if hasattr(s.planned_end, "isoformat") else str(s.planned_end)
+        schedules_summary.append({
+            "vessel_id": s.vessel_id,
+            "vessel_name": s.vessel_name,
+            "vessel_code": s.vessel_code,
+            "berth_id": s.berth_id,
+            "berth_code": s.berth_code,
+            "planned_start": start_str,
+            "planned_end": end_str,
+            "waiting_time_hours": s.waiting_time,
+            "duration_hours": s.duration_hours,
+            "assigned_cranes": s.assigned_cranes,
+            "assignment_reason": s.assignment_reason,
+        })
+
+    logger.info(
+        "[WHATIF_CANONICAL_RESULT] sim_id=%s | deltas=%s | summary=%s",
+        simulation_id, deltas, summary_text
+    )
+
+    return {
+        "simulation_id": simulation_id,
+        "scenario_name": scenario_name,
+        "baseline_metrics": baseline_metrics,
+        "simulated_metrics": sim_metrics,
+        "baseline_congestion_score": baseline_congestion.score,
+        "simulated_congestion_score": sim_congestion_score,
+        "deltas": deltas,
+        "simulated_schedules": sim_run["schedules"],
+        "schedules_summary": schedules_summary,
+        "bottlenecks": bottlenecks,
+        "recommendations": recommendations,
+        "summary": summary_text,
+    }
+

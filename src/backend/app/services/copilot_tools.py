@@ -204,10 +204,11 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
             "name": "simulate_scenario",
             "description": (
                 "Run an operational What-If simulation (Port Digital Twin) without modifying live data. "
-                "Simulates the impact of unavailable berths, offline cranes, or vessel arrival delays on "
-                "cumulative waiting time, financial demurrage cost ($), and the Port Congestion Index. "
-                "Use this when the user asks 'What if Berth 1 is closed?', 'What happens if Crane 2 breaks down?', "
-                "or asks to simulate an operational scenario."
+                "Simulates the impact of offline cranes or unavailable/max-capacity berths on waiting times, "
+                "demurrage costs, and congestion. MUST ONLY be called when the user has provided EXACT crane "
+                "codes (e.g. ['CR-05', 'CR-06']) or EXACT berth codes (e.g. ['B-03', 'B-04']). "
+                "DO NOT call this tool if the user only specified counts (such as '2 cranes' or '2 berths') without "
+                "specific IDs — ask the user which specific cranes or berths to simulate instead."
             ),
             "parameters": {
                 "type": "object",
@@ -219,12 +220,16 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                     "unavailable_berth_codes": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of berth codes to simulate as unavailable (e.g. ['B-01', 'B-02'])."
+                        "description": "Exact berth codes (e.g. ['B-03', 'B-04']) to simulate as unavailable or at maximum capacity. Do not pass placeholder or invented codes."
                     },
                     "unavailable_crane_codes": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of crane codes to simulate as failed (e.g. ['CR-01', 'CR-02'])."
+                        "description": "Exact crane codes (e.g. ['CR-05', 'CR-06']) to simulate as failed/offline. Do not pass placeholder or invented codes."
+                    },
+                    "additional_fleet_delay_hours": {
+                        "type": "number",
+                        "description": "Additional fleet arrival delay in hours (e.g. 2 or 2.0). Use when the user specifies an arrival delay, storm delay, or fleet schedule delay."
                     }
                 },
                 "required": []
@@ -710,56 +715,117 @@ def _get_latest_optimization_plan() -> Dict[str, Any]:
 
 
 def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Run counterfactual What-If optimization simulation."""
-    from app.optimization.optimizer import PortOptimizer
+    """Run counterfactual What-If optimization simulation with strict resource ID validation."""
+    from app.optimization.optimizer import run_whatif_simulation
 
     scenario_name = str(args.get("scenario_name") or "What-If Simulation")
     raw_berths = args.get("unavailable_berth_codes") or []
     raw_cranes = args.get("unavailable_crane_codes") or []
 
-    unavail_berth_codes = [str(c).upper().strip() for c in raw_berths if c]
-    unavail_crane_codes = [str(c).upper().strip() for c in raw_cranes if c]
+    unavail_berth_codes = [str(c).upper().strip() for c in raw_berths if str(c).strip()]
+    unavail_crane_codes = [str(c).upper().strip() for c in raw_cranes if str(c).strip()]
+
+    # If neither berths nor cranes were provided, return validation error
+    if not unavail_berth_codes and not unavail_crane_codes:
+        return {
+            "status": "validation_error",
+            "error_type": "missing_resource_ids",
+            "message": (
+                "No specific crane or berth IDs were provided. "
+                "Ask the user which specific crane IDs (e.g. CR-05, CR-06) or "
+                "berth IDs (e.g. B-03, B-04) should be simulated."
+            ),
+        }
+
+    # Validate crane IDs against real database
+    known_cranes = {c.get("crane_code", "").upper(): c for c in port_repo.cranes.values()}
+    invalid_cranes = [c for c in unavail_crane_codes if c not in known_cranes]
+    valid_cranes = [c for c in unavail_crane_codes if c in known_cranes]
+
+    if invalid_cranes:
+        valid_list_str = ", ".join(sorted(known_cranes.keys()))
+        if valid_cranes:
+            msg = (
+                f"{', '.join(valid_cranes)} was found, but {', '.join(invalid_cranes)} does not exist in the current port data. "
+                f"Valid cranes are {valid_list_str}. Please provide a valid crane ID."
+            )
+        else:
+            msg = (
+                f"{', '.join(invalid_cranes)} does not exist in the current port data. "
+                f"Valid cranes are {valid_list_str}. Please provide a valid crane ID."
+            )
+        return {
+            "status": "validation_error",
+            "error_type": "invalid_crane_ids",
+            "invalid_cranes": invalid_cranes,
+            "valid_cranes": valid_cranes,
+            "message": msg,
+        }
+
+    # Validate berth IDs against real database
+    known_berths = {b.get("berth_code", "").upper(): b for b in port_repo.berths.values()}
+    invalid_berths = [b for b in unavail_berth_codes if b not in known_berths]
+    valid_berths = [b for b in unavail_berth_codes if b in known_berths]
+
+    if invalid_berths:
+        valid_list_str = ", ".join(sorted(known_berths.keys()))
+        if valid_berths:
+            msg = (
+                f"{', '.join(valid_berths)} was found, but {', '.join(invalid_berths)} does not exist in the current port data. "
+                f"Valid berths are {valid_list_str}. Please provide a valid berth ID."
+            )
+        else:
+            msg = (
+                f"{', '.join(invalid_berths)} does not exist in the current port data. "
+                f"Valid berths are {valid_list_str}. Please provide a valid berth ID."
+            )
+        return {
+            "status": "validation_error",
+            "error_type": "invalid_berth_codes",
+            "invalid_berths": invalid_berths,
+            "valid_berths": valid_berths,
+            "message": msg,
+        }
 
     # Resolve IDs
-    unavail_berth_ids = [
-        b["id"] for b in port_repo.berths.values()
-        if b.get("berth_code", "").upper() in unavail_berth_codes
-    ]
-    unavail_crane_ids = [
-        c["id"] for c in port_repo.cranes.values()
-        if c.get("crane_code", "").upper() in unavail_crane_codes
-    ]
+    unavail_berth_ids = [known_berths[code]["id"] for code in unavail_berth_codes]
+    unavail_crane_ids = [known_cranes[code]["id"] for code in unavail_crane_codes]
 
-    # Baseline
-    baseline_opt = PortOptimizer(
-        vessels=list(port_repo.vessels.values()),
-        berths=list(port_repo.berths.values()),
-        cranes=list(port_repo.cranes.values()),
-        disruptions=list(port_repo.disruptions.values()),
-        horizon_hours=72
+    # Resolve additional fleet delay hours
+    raw_delay = (
+        args.get("additional_fleet_delay_hours")
+        or args.get("fleet_delay_hours")
+        or args.get("delay_hours")
+        or 0.0
     )
-    base_run = baseline_opt.solve()
-    base_wait = float(base_run.get("total_waiting_time", 0.0))
-    base_demurrage = float(base_run.get("metrics", {}).get("demurrage_cost_usd", 0.0))
+    try:
+        fleet_delay_hours = float(raw_delay)
+    except (TypeError, ValueError):
+        fleet_delay_hours = 0.0
 
-    # Simulated
-    sim_opt = PortOptimizer(
-        vessels=list(port_repo.vessels.values()),
-        berths=list(port_repo.berths.values()),
-        cranes=list(port_repo.cranes.values()),
-        disruptions=list(port_repo.disruptions.values()),
-        horizon_hours=72,
-        simulation_overrides={
-            "unavailable_berth_ids": unavail_berth_ids,
-            "unavailable_crane_ids": unavail_crane_ids
-        }
+    # Build canonical vessel_delay_hours dict matching What-If Studio:
+    # (vessel_delay_hours: simDelayHours > 0 ? Object.fromEntries(vessels.map(v => [v.id, simDelayHours])) : {})
+    vessel_delays: Dict[str, float] = {}
+    if fleet_delay_hours > 0:
+        vessel_delays = {v["id"]: fleet_delay_hours for v in port_repo.vessels.values()}
+
+    # Structured debug logging for Bob Copilot What-If request (Requirement 14)
+    logger.info(
+        "[BOB_WHATIF_REQUEST] berths=%s (%s) | cranes=%s (%s) | fleet_delay_hours=%.1f",
+        unavail_berth_codes, unavail_berth_ids, unavail_crane_codes, unavail_crane_ids, fleet_delay_hours
     )
-    sim_run = sim_opt.solve()
-    sim_wait = float(sim_run.get("total_waiting_time", 0.0))
-    sim_demurrage = float(sim_run.get("metrics", {}).get("demurrage_cost_usd", 0.0))
 
-    wait_delta = round(sim_wait - base_wait, 1)
-    demurrage_delta = round(sim_demurrage - base_demurrage, 2)
+    # Run shared canonical simulation engine
+    sim_data = run_whatif_simulation(
+        scenario_name=scenario_name,
+        unavailable_berth_ids=unavail_berth_ids,
+        unavailable_crane_ids=unavail_crane_ids,
+        vessel_delay_hours=vessel_delays,
+    )
+
+    baseline_metrics = sim_data["baseline_metrics"]
+    simulated_metrics = sim_data["simulated_metrics"]
+    deltas = sim_data["deltas"]
 
     return {
         "status": "ok",
@@ -767,17 +833,43 @@ def _simulate_scenario(args: Dict[str, Any]) -> Dict[str, Any]:
         "data_timestamp": _iso(datetime.now(timezone.utc)),
         "result_count": 1,
         "simulation": {
+            "simulation_id": sim_data.get("simulation_id"),
             "scenario_name": scenario_name,
-            "simulated_unavailable_berths": unavail_berth_codes,
-            "simulated_unavailable_cranes": unavail_crane_codes,
-            "baseline_waiting_hours": base_wait,
-            "simulated_waiting_hours": sim_wait,
-            "waiting_time_delta_hours": wait_delta,
-            "demurrage_delta_usd": demurrage_delta,
-            "summary": (
-                f"Simulating scenario '{scenario_name}' causes a {wait_delta:+.1f}h shift "
-                f"in vessel waiting time with ${demurrage_delta:+,.0f} demurrage exposure delta."
-            )
-        }
+            "simulated_unavailable_berths": [
+                {"code": code, "name": known_berths[code].get("berth_name")}
+                for code in unavail_berth_codes
+            ],
+            "simulated_unavailable_cranes": [
+                {"code": code, "name": known_cranes[code].get("crane_name")}
+                for code in unavail_crane_codes
+            ],
+            "additional_fleet_delay_hours": fleet_delay_hours,
+            "baseline": {
+                "avg_waiting_hours": baseline_metrics.get("avg_waiting_hours", 0.0),
+                "total_waiting_hours": float(baseline_metrics.get("vessels_scheduled", 0)) * float(baseline_metrics.get("avg_waiting_hours", 0.0)),
+                "demurrage_cost_usd": baseline_metrics.get("demurrage_cost_usd", 0.0),
+                "congestion_score": sim_data.get("baseline_congestion_score"),
+                "co2_emissions_mt": baseline_metrics.get("co2_emissions_mt", 0.0),
+            },
+            "simulated": {
+                "avg_waiting_hours": simulated_metrics.get("avg_waiting_hours", 0.0),
+                "total_waiting_hours": float(simulated_metrics.get("vessels_scheduled", 0)) * float(simulated_metrics.get("avg_waiting_hours", 0.0)),
+                "demurrage_cost_usd": simulated_metrics.get("demurrage_cost_usd", 0.0),
+                "congestion_score": sim_data.get("simulated_congestion_score"),
+                "co2_emissions_mt": simulated_metrics.get("co2_emissions_mt", 0.0),
+            },
+            "deltas": {
+                "queue_waiting_delta_hours": deltas.get("queue_waiting_delta_hours", 0.0),
+                "waiting_time_delta_hours": deltas.get("waiting_time_delta_hours", 0.0),
+                "demurrage_delta_usd": deltas.get("demurrage_delta_usd", 0.0),
+                "congestion_index_delta": deltas.get("congestion_index_delta", 0.0),
+                "congestion_score_delta": deltas.get("congestion_score_delta", 0.0),
+                "co2_delta_mt": deltas.get("co2_delta_mt", 0.0),
+            },
+            "schedules_summary": sim_data.get("schedules_summary", []),
+            "primary_bottlenecks": sim_data.get("bottlenecks", []),
+            "recommended_actions": sim_data.get("recommendations", []),
+            "summary": sim_data["summary"],
+        },
     }
 
