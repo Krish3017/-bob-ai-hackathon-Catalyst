@@ -80,7 +80,7 @@ The command center provides dedicated telemetry modules across all terminal asse
 ---
 
 ### 2.5 Bob Copilot: Agentic AI with Controlled Tool Execution
-Rather than relying on generic, ungrounded conversational LLMs, NaviOps integrates **Bob Copilot**, an agentic AI assistant powered by Groq's high-speed inference engine (`openai/gpt-oss-120b`).
+Rather than relying on generic, ungrounded conversational LLMs, NaviOps integrates **Bob AI**, an agentic AI assistant powered by Groq's high-speed inference engine (`openai/gpt-oss-120b`).
 
 ```mermaid
 sequenceDiagram
@@ -143,7 +143,7 @@ The system includes a dedicated `/users` administrative portal with in-modal use
     │ Congestion index immediately increases (+5 High penalty); affected crane locked.
     ▼
  4. Combinatorial Optimization Trigger
-    │ Dispatcher triggers OR-Tools CP-SAT 72h optimization via UI or Bob Copilot.
+    │ Dispatcher triggers OR-Tools CP-SAT 72h optimization via UI or Bob AI.
     │ Solver models interval variables, checks non-overlap, and minimizes waiting time.
     ▼
  5. Visual Gantt Review & Verification
@@ -153,8 +153,8 @@ The system includes a dedicated `/users` administrative portal with in-modal use
  6. Schedule Approval & Application
     │ Admin clicks "Approve & Apply Plan". Candidate assignments become active.
     ▼
- 7. Conversational Inquiries via Bob Copilot
-    │ Operators query Bob Copilot in natural language for vessel status, crane rates,
+ 7. Conversational Inquiries via Bob AI
+    │ Operators query Bob AI in natural language for vessel status, crane rates,
     │ or further downstream scheduling inquiries.
 ```
 
