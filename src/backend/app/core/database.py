@@ -215,6 +215,7 @@ class PortRepository:
         self.disruptions = SyncedTable(self, "disruptions")
         self.optimization_runs = SyncedTable(self, "optimization_runs")
         self.schedules = SyncedTable(self, "schedules")
+        self.schedule_version: int = 1
 
         # 1. Preload users from persistent SQLite store if available
         sqlite_users = _load_users_sqlite()
